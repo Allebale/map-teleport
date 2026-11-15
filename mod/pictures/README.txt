@@ -1,4 +1,4 @@
-Put a picture of each level here, and the map shows it beside the level.
+Put a picture of each level here (Super Mario Sunshine belongs to Nintendo, Super Mario Eclipse and its logo to the Eclipse Team), and the map shows it beside the level.
 
 Name each one after the level as the map writes it, in lower case with spaces as dashes, as PNG:
   delfino-plaza.png, bianco-hills.png, ricco-harbor.png, gelato-beach.png, pinna-park.png,

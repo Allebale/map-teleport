@@ -12,3 +12,11 @@ Which levels: the ones this save file has been to since the mod was on, and in S
 the file has a Shine of. They are kept for each save file of each game, at once. A setting opens every level.
 
 Build: `cmake -S . -B build -DSMS_MODS_OUT=<the game's mods folder> && cmake --build build`.
+
+## Credits
+
+- **Super Mario Sunshine** and its levels, characters and pictures belong to **Nintendo**.
+- **Super Mario Eclipse**, its levels, its logo and the pictures of its levels belong to the **Eclipse Team**.
+  The descriptions of Eclipse's levels are based on their guide.
+- The descriptions of Super Mario Sunshine's levels are based on the **Super Mario Wiki** (mariowiki.com).
+- The map and the mod are by Allebale. This is a fan-made mod, not made or endorsed by Nintendo or the Eclipse Team.
