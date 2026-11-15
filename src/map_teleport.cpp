@@ -46,7 +46,7 @@ const Spot kSpots[] = {
     {"peach beach", 770, 905}, {"peach", 1250, 640},
     // and the worlds the Daisy Cruiser sails to, round it
     {"daisy", 925, 872}, {"dream", 830, 985}, {"spettro", 920, 1015}, {"vaporwave", 1015, 1000}, {"lancia", 1095, 950},
-    {"red lily", 1110, 860}, {"yoshi village", 1040, 800},
+    {"red lily", 1110, 860}, {"redlily", 1110, 860}, {"yoshi village", 1040, 800},
 };
 const float kPicW = 1460.0f, kPicH = 1095.0f;
 
@@ -704,6 +704,7 @@ struct MapTeleport : sms::Mod {
 		    {"vaporwave", "A vaporwave world of checkerboards and blue Cataquacks."},
 		    {"lancia", "An icy mountain with a castle, ice puzzles and a giant ice cube."},
 		    {"red lily", "A town of alleys, bubbles, a playground and a Coconut Cafe."},
+		    {"redlily", "A town of alleys, bubbles, a playground and a Coconut Cafe."},
 		    {"peach beach", "Shipping containers, a coral ring, a plaza and go-karts."},
 		    {"yoshi village", "Yoshi houses, an umbrella and a flagpole, by the cruiser."},
 		    {"peach", "The bonus hub, leading to the bonus levels."},
