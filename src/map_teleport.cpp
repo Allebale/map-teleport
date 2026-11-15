@@ -429,13 +429,16 @@ struct MapTeleport : sms::Mod {
 		// part and episode been to
 		for (std::map<std::string, Place>::iterator it = by.begin(); it != by.end(); ++it) {
 			Place& p = it->second;
-			if (p.entries.size() <= 1)
+			if (p.entries.empty())
 				continue;
 			Entry go = p.entries[0];
 			if (sunshineWorlds() && episodeShines(p.world))
 				for (size_t i = 0; i < p.entries.size(); i++)
 					if (p.entries[i].area == p.world && p.entries[i].episode >= go.episode)
 						go = p.entries[i];
+			// no episode named: the game opens a world's episode select (TMarDirector::moveStage), picks the
+			// plaza's, the hotel's and the park's by the story, and takes any other level's first
+			go.episode = kStoryEpisode;
 			p.entries.assign(1, go);
 		}
 		places.clear();
