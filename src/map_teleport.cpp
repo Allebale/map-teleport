@@ -520,7 +520,7 @@ struct MapTeleport : sms::Mod {
 		if (b == 0)
 			return false;
 		SmsPad p = pad(0);
-		if (!p.connected || !(p.pressed & SMS_PAD_DOWN))
+		if (!p.connected || !(p.pressed & SMS_PAD_UP))
 			return false;
 		return b == 1 || (p.held & SMS_PAD_Z);
 	}
@@ -650,7 +650,7 @@ struct MapTeleport : sms::Mod {
 		kSpace  = input().key_from_name("Space");
 		kEscape = input().key_from_name("Escape");
 		kBack   = input().key_from_name("Backspace");
-		static const char* const kButtons[] = {"None", "D-pad down", "Z and D-pad down"};
+		static const char* const kButtons[] = {"None", "D-pad up", "Z and D-pad up"};
 		optionChoice("pad_button", "Controller button to open the map", std::vector<const char*>(kButtons, kButtons + 3), 1);
 
 		const SmsGameState st = state();

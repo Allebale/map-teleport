@@ -3,7 +3,7 @@
 A mod for the Super Mario Sunshine PC port (and Super Mario Eclipse builds): open a map of Isle Delfino
 in a stage and teleport to any level your save file has reached.
 
-- **M** (or D-pad down on a controller; Z and D-pad down, or none, in the Mods menu) opens the map.
+- **M** (or D-pad up on a controller; Z and D-pad up, or none, in the Mods menu) opens the map.
 - Move between levels with the stick, the D-pad or the arrow keys. **A** or Enter chooses, **B**, Escape or M goes back.
 - A level with several episodes opens a list of them: the ones its episode select would offer.
 - Grey places are not reached yet.
