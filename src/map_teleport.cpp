@@ -33,13 +33,20 @@ struct Spot {
 	const char* key;
 	float x, y;
 };
+// (more particular names first: "pianta pit" before "pianta")
 const Spot kSpots[] = {
-    {"airstrip", 1165, 530},    {"plaza", 1015, 632},      {"bianco", 848, 497},     {"ricco", 795, 610},
-    {"gelato", 678, 483},       {"pinna", 503, 783},       {"sirena", 468, 560},     {"pianta", 780, 362},
-    {"noki", 532, 362},         {"corona", 947, 442},      {"lacrima", 710, 289},    {"rugivosa", 797, 271},
-    {"warship", 882, 298},      {"arido", 995, 353},       {"erto", 1044, 463},      {"bollente", 912, 537},
-    {"fire shrine", 985, 553},  {"giovane", 740, 522},     {"sonnolento", 642, 347}, {"arcobaleno", 454, 443},
-    {"marea", 638, 655},        {"lighthouse", 657, 747},  {"daisy", 925, 872},      {"peach", 1250, 640},
+    // Super Mario Sunshine's
+    {"airstrip", 1165, 530}, {"plaza", 1015, 632}, {"bianco", 848, 497}, {"ricco station", 850, 650}, {"ricco", 795, 610},
+    {"gelato", 678, 483}, {"pinna", 503, 783}, {"sirena", 468, 560}, {"pianta pit", 760, 415}, {"pianta", 780, 362},
+    {"noki", 532, 362}, {"corona", 947, 442},
+    // Super Mario Eclipse's island
+    {"lacrima", 710, 289}, {"rugiv", 797, 271}, {"warship", 882, 298}, {"arido", 995, 353}, {"erto", 1044, 463},
+    {"crypt", 912, 537}, {"fire shrine", 985, 553}, {"giovane", 740, 522}, {"sonnolento", 642, 347},
+    {"arcobaleno", 454, 443}, {"marea", 638, 655}, {"lighthouse", 657, 747}, {"delfino express", 1090, 600},
+    {"peach beach", 770, 905}, {"peach", 1250, 640},
+    // and the worlds the Daisy Cruiser sails to, round it
+    {"daisy", 925, 872}, {"dream", 830, 985}, {"spettro", 920, 1015}, {"vaporwave", 1015, 1000}, {"lancia", 1095, 950},
+    {"red lily", 1110, 860}, {"yoshi village", 1040, 800},
 };
 const float kPicW = 1460.0f, kPicH = 1095.0f;
 
@@ -247,6 +254,11 @@ struct MapTeleport : sms::Mod {
 	void placeOnMap(Place& p) const
 	{
 		const std::string n = lower(p.name);
+		// Super Mario Eclipse's bonus levels that are old versions of these ("Beta Bianco Hills"): the list
+		static const char* const kOld[] = {"beta", "e3 ", "spaceworld", "old ", " v1"};
+		for (size_t i = 0; i < sizeof kOld / sizeof *kOld; i++)
+			if (n.find(kOld[i]) != std::string::npos)
+				return;
 		for (size_t i = 0; i < sizeof kSpots / sizeof *kSpots; i++)
 			if (n.find(kSpots[i].key) != std::string::npos) {
 				p.x = kSpots[i].x / kPicW, p.y = kSpots[i].y / kPicH;
@@ -659,18 +671,47 @@ struct MapTeleport : sms::Mod {
 			const char* key;
 			const char* text;
 		} kAbout[] = {
-		    {"plaza", "The island's main town, and the way to every level."},
-		    {"airstrip", "Where Mario's holiday begins and he finds FLUDD."},
-		    {"bianco", "A green hillside village of windmills by a lake."},
-		    {"ricco", "A busy harbour of fishing boats, cranes and Bloopers."},
-		    {"gelato", "A sunny beach of sand castles, Wigglers and surf."},
-		    {"pinna", "A seaside fun park with a roller coaster and a big Mecha-Bowser."},
-		    {"sirena", "A quiet beach resort, with Hotel Delfino and its ghosts."},
-		    {"pianta", "A village up in giant mushroom trees, over a dark valley."},
-		    {"noki", "Tall cliffs and old ruins over a deep blue bay."},
-		    {"corona", "A volcano, the last level, where Bowser waits."},
+		    // from the Super Mario Wiki (mariowiki.com), in the mod's words
+		    {"airstrip", "The first area. A small landing strip on islets near Delfino Plaza, where Mario finds FLUDD and faces Proto Piranha."},
+		    {"plaza", "Isle Delfino's biggest town and the hub to every level, with the Shine Gate, the Grand Pianta Statue, a lighthouse and sewers below."},
+		    {"bianco", "The first level, entered through a Rainbow M. A windmill village of Piantas, green hills and a lake with the Big Windmill. Boss, Petey Piranha."},
+		    {"ricco station", "A pathway. Its Shine comes from cleaning a red sign."},
+		    {"ricco", "A busy port of ships, the tall Ricco Tower and a building site of cranes. Bosses, Gooper Blooper and Shadow Mario."},
+		    {"gelato", "The isle's largest and sunniest beach, where mirrors keep the Sand Bird's egg warm in the Shine Tower. Bosses, Wiggler and Plungelo."},
+		    {"pinna", "An amusement park on the dolphin's tail fin, with a roller coaster, a Ferris wheel and pirate ships. Boss, Mecha-Bowser."},
+		    {"sirena", "A south coast beach, home of Hotel Delfino with its attic maze and casino. Opened by Yoshi eating a giant pineapple. Boss, King Boo."},
+		    {"noki", "The Nokis' home. A bay of cliffs and waterfalls where sprayed paintings show hidden paths. Boss, Eely-Mouth, among the most bosses of any level."},
+		    {"pianta pit", "A treetop village with Chucksters, a great tree and campfires to put out. Tramplin Stu roams the pit."},
+		    {"pianta", "The Piantas' old home, built on a giant tree over a pit. Reached by a pipe atop the Shine Gate, with the Rocket Nozzle."},
+		    {"corona", "The final level, a volcano behind Delfino Plaza, of lava and a mudboat ride. Bowser and Bowser Jr. wait at the top."},
+		    // Super Mario Eclipse's (its own guide)
+		    {"erto", "A town with a train station, a pavilion, rock pillars with tightropes and a cave tunnel."},
+		    {"lighthouse", "A lighthouse, a fruit hut, a forest path and a Blooper race through stone rings."},
+		    {"lacrima", "A hotel with a reception desk, a kitchen, an arcade and a mafia basement."},
+		    {"warship", "Pirate ships, a submarine and an underwater base with Cheep Cheep tanks."},
+		    {"fire shrine", "Corona Mountain made over, of pillars, clouds, lava and blocks. It turns back into Corona Mountain once the plaza floods."},
+		    {"giovane", "A pathway of waterfalls. Its Shine stands on a pedestal behind the lowest one."},
+		    {"crypt", "A pathway where all nine torches on the walls must be put out."},
+		    {"marea", "A pathway where a water mushroom must be ground pounded."},
+		    {"arido", "A pathway where eight flowers by the wall must be sprayed open."},
+		    {"delfino express", "A pathway where a little girl talks until a Shine appears."},
+		    {"arcobaleno", "A pathway where a pearl in a clam's mouth must be ground pounded."},
+		    {"sonnolento", "A pathway with a lamp fire to put out in the middle of the grove."},
+		    {"rugiv", "A pathway where stone statues tell their story."},
+		    {"daisy", "The hub after the game is beaten. A cruise ship sailing to seven new levels, with the FLUDDless Flight Path Peril."},
+		    {"dream", "Broken pillars, a rotating square, an arch of coins and a rainbow bridge."},
+		    {"spettro", "A casino of poker chips and card houses full of Boos."},
+		    {"vaporwave", "A vaporwave world of checkerboards and blue Cataquacks."},
+		    {"lancia", "An icy mountain with a castle, ice puzzles and a giant ice cube."},
+		    {"red lily", "A town of alleys, bubbles, a playground and a Coconut Cafe."},
+		    {"peach beach", "Shipping containers, a coral ring, a plaza and go-karts."},
+		    {"yoshi village", "Yoshi houses, an umbrella and a flagpole, by the cruiser."},
+		    {"peach", "The bonus hub, leading to the bonus levels."},
 		};
 		const std::string n = lower(name);
+		if (n.find("beta") != std::string::npos || n.find("e3 ") != std::string::npos || n.find("spaceworld") != std::string::npos ||
+		    n.find("old ") != std::string::npos)
+			return nullptr; // an old version of a level (Super Mario Eclipse's bonus levels)
 		for (size_t i = 0; i < sizeof kAbout / sizeof *kAbout; i++)
 			if (n.find(kAbout[i].key) != std::string::npos)
 				return kAbout[i].text;
@@ -756,9 +797,9 @@ struct MapTeleport : sms::Mod {
 				d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
 				y += 21;
 			}
-			if (const char* a = about(pl.name))
-				y = wrapText(px + 12, y, pw - 24, 11, SMS_RGB(190, 200, 220), a);
 		}
+		if (const char* a = about(pl.name))
+			y = wrapText(px + 12, y, pw - 24, 11, SMS_RGB(190, 200, 220), a);
 		d.clip_pop();
 	}
 
