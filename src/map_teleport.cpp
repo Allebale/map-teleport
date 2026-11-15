@@ -1,15 +1,17 @@
-// Map Teleport: a map of Isle Delfino, opened in a stage (M, or a controller button), with every
-// level the save file has reached on it; choose one (and its episode) and Mario is taken there, as
-// a warp pipe would.
+// Map Teleport: a map of Isle Delfino, opened in a stage (N, or a controller button), with every
+// level the save file has reached on it; choose one and Mario is taken there, as a warp pipe would.
+// No episodes to choose: a Super Mario Sunshine world goes to the one its episode select offers
+// first, the plaza as the story has it, other levels to where they were first been to.
 //
-// Which levels: the ones this save file has been to since the mod was on (kept with the save file,
-// files->*, one list for each save file of each game, kept at once), and in Super Mario Sunshine also
-// every world the file has a Shine of. A world's episodes are the ones its own episode select
-// offers (the Shines had, and the next). Super Mario Eclipse numbers its stages its own way (no
-// api->world there), so its levels are the ones visited, by the episodes they were visited in.
+// Which levels: the ones this save file has been to since the mod was on (the mod's own file for
+// each save file of each game, written at once), and in Super Mario Sunshine also every world the
+// file has a Shine of. Super Mario Eclipse numbers its stages its own way, so there only the levels
+// been to. A setting opens every level.
 //
 // The map is the mod's own: Isle Delfino drawn from circles, each level's place on it found by its
-// name (game->area_name); a level whose name is not known goes in a list at the map's side.
+// name (game->area_name); a level whose name is not known goes in a list at the map's side. The
+// panel at its side shows the level's picture (pictures/<name>.png, the player's own screenshots),
+// whether it is reached, and in Super Mario Sunshine its Shines, coin record and a few words.
 #include <sms_mod.hpp>
 
 #include <ctype.h>
@@ -84,6 +86,11 @@ const unsigned char kEpisodeShines[7][8] = {
     {0x3C, 0x41, 0x3E, 0x3D, 0x40, 0x3F, 0x42, 0x43}, // Pianta Village
     {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39}, // Noki Bay
 };
+// each world's other three Shines (the 100 coins' and the blue coins')
+const unsigned char kEtcShines[7][3] = {
+    {0x64, 0x08, 0x09}, {0x65, 0x12, 0x13}, {0x66, 0x1C, 0x1D}, {0x67, 0x26, 0x27},
+    {0x68, 0x30, 0x31}, {0x6A, 0x44, 0x45}, {0x69, 0x3A, 0x3B},
+};
 int shineStage(int area) { return area >= 0 && area < 61 ? kShineStage[area] : -1; }
 // SMS_AREA_*, as api->world's area_kind
 int areaKind(int area)
@@ -151,8 +158,8 @@ struct MapTeleport : sms::Mod {
 	bool shown   = false; // the map is up
 	bool leaving = false; // a teleport asked: the controls kept until the stage changes
 	double leftAt = 0;
-	bool inList  = false; // choosing a level's episode
-	int sel = 0, item = 0;
+	int sel = 0;
+	std::map<std::string, SmsImage> pictures; // each level's picture (0: none), loaded once
 	int lastDir = 0;
 	double nextRepeat = 0;
 	uint16_t prevHeld = 0;
@@ -405,10 +412,39 @@ struct MapTeleport : sms::Mod {
 			buildSunshine(by);
 		else
 			buildByName(by);
+		// one place to go for each level, no episodes to choose: a Sunshine world's the one its episode
+		// select offers first (the newest with no Shine), the plaza as the story has it, else the first
+		// part and episode been to
+		for (std::map<std::string, Place>::iterator it = by.begin(); it != by.end(); ++it) {
+			Place& p = it->second;
+			if (p.entries.size() <= 1)
+				continue;
+			Entry go = p.entries[0];
+			if (sunshineWorlds() && episodeShines(p.world))
+				for (size_t i = 0; i < p.entries.size(); i++)
+					if (p.entries[i].area == p.world && p.entries[i].episode >= go.episode)
+						go = p.entries[i];
+			p.entries.assign(1, go);
+		}
 		places.clear();
 		int side = 0;
 		for (std::map<std::string, Place>::iterator it = by.begin(); it != by.end(); ++it) {
 			Place p = it->second;
+			// one way in for each place (no episodes to choose: a warp's episode is not always kept,
+			// Eclipse picks its own): a Sunshine world's newest episode (as its episode select
+			// offers first), else the first one listed
+			if (p.entries.size() > 1) {
+				size_t keep = 0;
+				for (size_t i = 0; i < p.entries.size(); i++)
+					if (p.world >= 0 && p.entries[i].area == p.world && episodeShines(p.world) &&
+					    p.entries[i].episode >= p.entries[keep].episode && p.entries[keep].area == p.world)
+						keep = i;
+				Entry e = p.entries[keep];
+				p.entries.clear();
+				p.entries.push_back(e);
+			}
+			if (!p.entries.empty())
+				p.entries[0].label = p.name;
 			placeOnMap(p);
 			if (!p.onMap) {
 				if (!p.open)
@@ -460,8 +496,6 @@ struct MapTeleport : sms::Mod {
 	{
 		build();
 		shown   = true;
-		inList  = false;
-		item    = 0;
 		lastDir = 0;
 		prevHeld = 0xFFFF; // the button that opened it: let go first
 		sound(SMS_SOUND_DECIDE);
@@ -561,20 +595,6 @@ struct MapTeleport : sms::Mod {
 		const bool choose = (pressed & SMS_PAD_A) != 0;
 		const bool back   = (pressed & (SMS_PAD_B | SMS_PAD_START)) || key(openKey);
 
-		if (inList) {
-			const Place& pl = places[sel];
-			const int n = (int)pl.entries.size();
-			if (step && n > 0 && (dir == 1 || dir == 2)) {
-				item = (item + (dir == 1 ? n - 1 : 1)) % n;
-				sound(SMS_SOUND_CURSOR);
-			}
-			if (back) {
-				inList = false;
-				sound(SMS_SOUND_CANCEL);
-			} else if (choose && n > 0)
-				teleport(pl.entries[item]);
-			return;
-		}
 		if (step) {
 			const float dx = dir == 3 ? -1.0f : dir == 4 ? 1.0f : 0.0f, dy = dir == 1 ? -1.0f : dir == 2 ? 1.0f : 0.0f;
 			move(dx, dy);
@@ -583,19 +603,10 @@ struct MapTeleport : sms::Mod {
 			closeMap();
 		else if (choose && sel >= 0) {
 			const Place& pl = places[sel];
-			if (!pl.open || pl.entries.empty()) {
+			if (!pl.open || pl.entries.empty())
 				sound(SMS_SOUND_DAMAGE);
-			} else if (pl.entries.size() == 1)
+			else
 				teleport(pl.entries[0]);
-			else {
-				inList = true;
-				item   = 0;
-				// start on the episode played last, or the newest
-				for (size_t i = 0; i < pl.entries.size(); i++)
-					if (pl.entries[i].area == state().area && pl.entries[i].episode == state().episode)
-						item = (int)i;
-				sound(SMS_SOUND_DECIDE);
-			}
 		}
 	}
 
@@ -613,6 +624,143 @@ struct MapTeleport : sms::Mod {
 	}
 
 	// ---------------------------------------------------------- drawing
+
+	// a level's picture: pictures/<its name>.png in the mod's folder (lower case, spaces as '-'),
+	// for the player's own screenshots
+	static std::string pictureName(const std::string& name)
+	{
+		std::string k;
+		for (size_t i = 0; i < name.size(); i++) {
+			const char c = (char)tolower((unsigned char)name[i]);
+			if (isalnum((unsigned char)c))
+				k += c;
+			else if (c == ' ' && !k.empty() && k[k.size() - 1] != '-')
+				k += '-';
+		}
+		while (!k.empty() && k[k.size() - 1] == '-')
+			k.erase(k.size() - 1);
+		return "pictures/" + k + ".png";
+	}
+	SmsImage picture(const std::string& name)
+	{
+		const std::string file = pictureName(name);
+		std::map<std::string, SmsImage>::iterator it = pictures.find(file);
+		if (it != pictures.end())
+			return it->second;
+		const SmsImage im = draw().image_load ? draw().image_load(handle(), file.c_str()) : 0;
+		pictures[file]    = im;
+		return im;
+	}
+
+	// a few words on a Super Mario Sunshine level (the mod's own), or null
+	static const char* about(const std::string& name)
+	{
+		static const struct {
+			const char* key;
+			const char* text;
+		} kAbout[] = {
+		    {"plaza", "The island's main town, and the way to every level."},
+		    {"airstrip", "Where Mario's holiday begins and he finds FLUDD."},
+		    {"bianco", "A green hillside village of windmills by a lake."},
+		    {"ricco", "A busy harbour of fishing boats, cranes and Bloopers."},
+		    {"gelato", "A sunny beach of sand castles, Wigglers and surf."},
+		    {"pinna", "A seaside fun park with a roller coaster and a big Mecha-Bowser."},
+		    {"sirena", "A quiet beach resort, with Hotel Delfino and its ghosts."},
+		    {"pianta", "A village up in giant mushroom trees, over a dark valley."},
+		    {"noki", "Tall cliffs and old ruins over a deep blue bay."},
+		    {"corona", "A volcano, the last level, where Bowser waits."},
+		};
+		const std::string n = lower(name);
+		for (size_t i = 0; i < sizeof kAbout / sizeof *kAbout; i++)
+			if (n.find(kAbout[i].key) != std::string::npos)
+				return kAbout[i].text;
+		return nullptr;
+	}
+
+	// text in lines no wider than w
+	float wrapText(float x, float y, float w, float size, SmsColor c, const char* text) const
+	{
+		const SmsDrawApi& d = draw();
+		std::string line, word;
+		const std::string t = std::string(text) + " ";
+		for (size_t i = 0; i < t.size(); i++) {
+			if (t[i] != ' ') {
+				word += t[i];
+				continue;
+			}
+			const std::string next = line.empty() ? word : line + " " + word;
+			if (!line.empty() && d.text_width(size, next.c_str()) > w) {
+				d.text(x, y, size, c, SMS_TEXT_SHADOW, line.c_str());
+				y += size + 4;
+				line = word;
+			} else
+				line = next;
+			word.clear();
+		}
+		if (!line.empty()) {
+			d.text(x, y, size, c, SMS_TEXT_SHADOW, line.c_str());
+			y += size + 4;
+		}
+		return y;
+	}
+
+	void drawPanel(float px, float py, float pw, float ph)
+	{
+		const SmsDrawApi& d = draw();
+		d.rect(px, py, pw, ph, SMS_RGBA(20, 25, 40, 230));
+		d.rect_outline(px, py, pw, ph, 2.0f, SMS_RGB(90, 60, 30));
+		float y = py + 12;
+		if (sel < 0) {
+			d.text(px + 12, y, 13, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, "No levels yet");
+			return;
+		}
+		const Place& pl = places[sel];
+		d.clip_push(px, py, pw, ph);
+		y = wrapText(px + 12, y, pw - 24, 16, SMS_RGB(255, 230, 60), pl.name.c_str()) + 6;
+
+		// its picture (16 by 9), or where one may go
+		const float iw = pw - 24, ih = iw * 9.0f / 16.0f;
+		const SmsImage im = picture(pl.name);
+		if (im) {
+			d.image(im, px + 12, y, iw, ih, pl.open ? SMS_RGB(255, 255, 255) : SMS_RGB(110, 110, 110));
+		} else {
+			d.rect(px + 12, y, iw, ih, SMS_RGBA(255, 255, 255, 18));
+			d.rect_outline(px + 12, y, iw, ih, 1.0f, SMS_RGBA(255, 255, 255, 60));
+			d.text(px + 12 + iw * 0.5f, y + ih * 0.5f - 12, 11, SMS_RGB(170, 170, 180), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, "No picture yet");
+			d.text(px + 12 + iw * 0.5f, y + ih * 0.5f + 4, 9, SMS_RGB(130, 130, 140), SMS_TEXT_SHADOW | SMS_TEXT_CENTER,
+			       pictureName(pl.name).c_str());
+		}
+		y += ih + 10;
+
+		// reached or not, and what to press
+		d.text(px + 12, y, 12, pl.open ? SMS_RGB(140, 230, 140) : SMS_RGB(200, 200, 200), SMS_TEXT_SHADOW,
+		       pl.open ? "A to teleport here" : "Not reached yet");
+		y += 20;
+
+		// Super Mario Sunshine: its Shines and coin record
+		if (sunshineWorlds()) {
+			const SmsGameApi& g = game();
+			if (const unsigned char* ep = episodeShines(pl.world)) {
+				const unsigned char* etc = kEtcShines[shineStage(pl.world) - 2];
+				int had = 0;
+				for (int i = 0; i < 8; i++)
+					had += g.has_shine && g.has_shine(ep[i]) ? 1 : 0;
+				for (int i = 0; i < 3; i++)
+					had += g.has_shine && g.has_shine(etc[i]) ? 1 : 0;
+				char line[64];
+				snprintf(line, sizeof line, "Shines  %d of 11", had);
+				d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
+				y += 17;
+				const int record = g.flag_get ? (int)g.flag_get(0x20005u + (uint32_t)pl.world) : 0;
+				snprintf(line, sizeof line, "Coin record  %d", record);
+				d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
+				y += 21;
+			}
+			if (const char* a = about(pl.name))
+				y = wrapText(px + 12, y, pw - 24, 11, SMS_RGB(190, 200, 220), a);
+		}
+		d.clip_pop();
+	}
 
 	void drawMap(float cw, float ch)
 	{
@@ -674,53 +822,12 @@ struct MapTeleport : sms::Mod {
 			}
 		}
 
-		// the panel: the place chosen, and its episodes
-		d.rect(px, my, panelW, mapH, SMS_RGBA(20, 25, 40, 230));
-		d.rect_outline(px, my, panelW, mapH, 2.0f, SMS_RGB(90, 60, 30));
-		float y = my + 12;
-		if (sel < 0) {
-			d.text(px + 12, y, 13, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, "No levels yet");
-		} else {
-			const Place& pl = places[sel];
-			d.clip_push(px, my, panelW, mapH);
-			d.text(px + 12, y, 17, SMS_RGB(255, 230, 60), SMS_TEXT_SHADOW, pl.name.c_str());
-			y += 28;
-			if (!pl.open) {
-				d.text(px + 12, y, 12, SMS_RGB(200, 200, 200), SMS_TEXT_SHADOW, "Not reached yet");
-			} else if (!inList) {
-				char line[64];
-				if (pl.entries.size() == 1)
-					snprintf(line, sizeof line, "%s", "A to teleport");
-				else
-					snprintf(line, sizeof line, "%d to choose from, A to see", (int)pl.entries.size());
-				d.text(px + 12, y, 12, SMS_RGB(220, 220, 220), SMS_TEXT_SHADOW, line);
-				y += 20;
-				for (size_t i = 0; i < pl.entries.size() && y < my + mapH - 20; i++, y += 17)
-					d.text(px + 16, y, 11, SMS_RGB(170, 180, 200), SMS_TEXT_SHADOW, pl.entries[i].label.c_str());
-			} else {
-				// the list, scrolled to keep the one chosen in view
-				const float rowH = 19.0f;
-				const int rows   = (int)((my + mapH - 30.0f - y) / rowH);
-				int first        = item - rows / 2;
-				const int n      = (int)pl.entries.size();
-				if (first > n - rows)
-					first = n - rows;
-				if (first < 0)
-					first = 0;
-				for (int i = first; i < n && i < first + rows; i++, y += rowH) {
-					const bool on = i == item;
-					if (on)
-						d.rect(px + 6, y - 3, panelW - 12, rowH, SMS_RGBA(255, 230, 60, 60));
-					d.text(px + 14, y, 12, on ? SMS_RGB(255, 255, 255) : SMS_RGB(180, 190, 210), SMS_TEXT_SHADOW,
-					       pl.entries[i].label.c_str());
-				}
-			}
-			d.clip_pop();
-		}
+		// the panel: the place chosen, its picture and what is known of it
+		drawPanel(px, my, panelW, mapH);
+
 		// what the buttons do
 		char help[128];
-		snprintf(help, sizeof help, "%s", inList ? "Up and down choose   A teleport   B back"
-		                                         : "Move to a level   A choose   B close");
+		snprintf(help, sizeof help, "%s", "Move to a level   A teleport   B close");
 		d.text(cw * 0.5f, my + mapH + 8, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, help);
 	}
 
