@@ -659,8 +659,10 @@ struct MapTeleport : sms::Mod {
 		std::map<std::string, SmsImage>::iterator it = pictures.find(file);
 		if (it != pictures.end())
 			return it->second;
-		const SmsImage im = draw().image_load ? draw().image_load(handle(), file.c_str()) : 0;
-		pictures[file]    = im;
+		SmsImage im = draw().image_load ? draw().image_load(handle(), file.c_str()) : 0;
+		if (!im && state().eclipse && file != "pictures/eclipse.png") // a Super Mario Eclipse level with none of its own: the game's picture
+			im = picture("Eclipse");
+		pictures[file] = im;
 		return im;
 	}
 
