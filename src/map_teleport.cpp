@@ -3,7 +3,7 @@
 // a warp pipe would.
 //
 // Which levels: the ones this save file has been to since the mod was on (kept with the save file,
-// files->* scope SMS_FILES_CURRENT, so they are saved with it), and in Super Mario Sunshine also
+// files->*, one list for each save file of each game, kept at once), and in Super Mario Sunshine also
 // every world the file has a Shine of. A world's episodes are the ones its own episode select
 // offers (the Shines had, and the next). Super Mario Eclipse numbers its stages its own way (no
 // api->world there), so its levels are the ones visited, by the episodes they were visited in.
@@ -145,7 +145,8 @@ struct MapTeleport : sms::Mod {
 	using sms::Mod::Mod;
 
 	int openKey = -1;
-	int kUp = -1, kDown = -1, kLeft = -1, kRight = -1, kEnter = -1, kSpace = -1, kEscape = -1, kBack = -1;
+	int kUp = -1, kDown = -1, kLeft = -1, kRight = -1;
+	bool waitRelease = false; // closed: the game sees nothing until every button is let go
 
 	bool shown   = false; // the map is up
 	bool leaving = false; // a teleport asked: the controls kept until the stage changes
@@ -184,15 +185,23 @@ struct MapTeleport : sms::Mod {
 
 	// ---------------------------------------------------------- the save file's levels
 
+	// the list's file: the mod's own (written at once, so a level counts even when the game is not
+	// saved), one for each save file of each game
+	std::string listName(int file) const
+	{
+		char n[48];
+		snprintf(n, sizeof n, "visited-%s-%c.txt", state().eclipse ? "eclipse" : "sunshine", 'a' + (file & 3));
+		return n;
+	}
 	void loadVisited(int file)
 	{
 		visited.clear();
 		fileLoaded = file;
 		const SmsFilesApi* f = files();
-		if (!f || file < 0)
+		if (!f || file < 0 || file > 2)
 			return;
 		static char buf[64 * 1024];
-		int n = f->read(handle(), file, "visited.txt", buf, sizeof buf - 1);
+		int n = f->read(handle(), SMS_FILES_MOD, listName(file).c_str(), buf, sizeof buf - 1);
 		if (n <= 0)
 			return;
 		if (n > (int)sizeof buf - 1)
@@ -217,7 +226,8 @@ struct MapTeleport : sms::Mod {
 			snprintf(line, sizeof line, "%d %d\n", i->first, i->second);
 			s += line;
 		}
-		f->write(handle(), SMS_FILES_CURRENT, "visited.txt", s.data(), (uint32_t)s.size());
+		if (fileLoaded >= 0 && fileLoaded <= 2)
+			f->write(handle(), SMS_FILES_MOD, listName(fileLoaded).c_str(), s.data(), (uint32_t)s.size());
 	}
 	bool areaVisited(int area) const
 	{
@@ -271,6 +281,7 @@ struct MapTeleport : sms::Mod {
 	{
 		const SmsGameApi& g  = game();
 		const int shines     = g.shines ? g.shines() : 0;
+		const bool all       = setting("all_levels", 0) != 0;
 		for (int a = 0; a < 255; a++) {
 			const int kind = areaKind(a);
 			if (kind == SMS_AREA_NONE || kind == SMS_AREA_TITLE || areaName(a).empty())
@@ -297,7 +308,7 @@ struct MapTeleport : sms::Mod {
 			const int episodes = shines8 ? 8 : 0;
 			for (int e = 0; e < episodes && !p.open; e++)
 				p.open = g.has_shine && g.has_shine(shines8[e]);
-			if (wid == 1 && shines > 0)
+			if ((wid == 1 && shines > 0) || all)
 				p.open = true;
 			if (!p.open)
 				continue;
@@ -308,7 +319,7 @@ struct MapTeleport : sms::Mod {
 				for (int e = 0; e < 8; e++)
 					if (g.has_shine && g.has_shine(shines8[e]))
 						next = e + 1;
-				next = next > 7 ? 7 : next;
+				next = next > 7 || all ? 7 : next;
 				for (int e = 0; e <= next; e++) {
 					Entry en = {episodeName(wid, e), wid, e};
 					p.entries.push_back(en);
@@ -320,11 +331,15 @@ struct MapTeleport : sms::Mod {
 				if (a == wid && episodes > 0)
 					continue; // its episodes, above
 				if (a == 1 || a == 7 || a == 13 || a == 58) { // the game picks its episode
-					if (a == 1 || areaVisited(a)) {
+					if (a == 1 || all || areaVisited(a)) {
 						Entry en = {a == 1 ? p.name : partName(a, kind), a, kStoryEpisode};
 						p.entries.push_back(en);
 					}
 					continue;
+				}
+				if (all && !areaVisited(a)) {
+					Entry en = {a == wid ? p.name : partName(a, kind), a, 0};
+					p.entries.push_back(en);
 				}
 				for (std::set<std::pair<int, int> >::const_iterator v = visited.lower_bound(std::make_pair(a, 0));
 				     v != visited.end() && v->first == a; ++v) {
@@ -351,13 +366,21 @@ struct MapTeleport : sms::Mod {
 				p.name = n;
 			p.areas.push_back(a);
 		}
+		const bool all = setting("all_levels", 0) != 0;
 		for (std::map<std::string, Place>::iterator it = by.begin(); it != by.end(); ++it) {
 			Place& p = it->second;
 			int part = 0;
 			for (size_t i = 0; i < p.areas.size(); i++) {
 				const int a = p.areas[i];
-				if (!areaVisited(a))
+				if (!areaVisited(a)) {
+					if (all) { // never been: its first episode
+						std::string label = p.areas.size() > 1 ? "Part " + std::to_string(i + 1) : p.name;
+						Entry en = {label, a, 0};
+						p.entries.push_back(en);
+						part++;
+					}
 					continue;
+				}
 				part++;
 				for (std::set<std::pair<int, int> >::const_iterator v = visited.lower_bound(std::make_pair(a, 0));
 				     v != visited.end() && v->first == a; ++v) {
@@ -390,7 +413,9 @@ struct MapTeleport : sms::Mod {
 			if (!p.onMap) {
 				if (!p.open)
 					continue; // an unknown name not reached: left out
-				p.x = 0.05f, p.y = 0.12f + 0.07f * (float)side++;
+				const int row = side % 12, col = side / 12;
+				side++;
+				p.x = 0.04f + 0.22f * (float)col, p.y = 0.12f + 0.07f * (float)row;
 			}
 			places.push_back(p);
 		}
@@ -422,7 +447,7 @@ struct MapTeleport : sms::Mod {
 		if (sunshineWorlds() && areaKind(st.area) == SMS_AREA_TITLE)
 			return false;
 		const char* by = input().captured_by ? input().captured_by() : nullptr;
-		return !by;
+		return !by && !waitRelease;
 	}
 
 	void sound(uint32_t id) const
@@ -434,8 +459,6 @@ struct MapTeleport : sms::Mod {
 	void openMap()
 	{
 		build();
-		if (!input().capture(handle(), 1))
-			return;
 		shown   = true;
 		inList  = false;
 		item    = 0;
@@ -445,9 +468,8 @@ struct MapTeleport : sms::Mod {
 	}
 	void closeMap(bool quiet = false)
 	{
-		if (shown && !leaving)
-			input().capture(handle(), 0);
-		shown = false;
+		shown       = false;
+		waitRelease = true;
 		if (!quiet)
 			sound(SMS_SOUND_CANCEL);
 	}
@@ -466,7 +488,7 @@ struct MapTeleport : sms::Mod {
 	void endLeaving()
 	{
 		if (leaving)
-			input().capture(handle(), 0);
+			waitRelease = true;
 		leaving = false;
 	}
 
@@ -502,6 +524,14 @@ struct MapTeleport : sms::Mod {
 
 	bool key(int k) const { return k > 0 && input().key_pressed(k); }
 
+	// every button and stick let go (the controller as read, keyboard and mouse too)
+	bool allLetGo() const
+	{
+		SmsPad p = pad(0);
+		return !p.connected || (!p.held && fabsf(p.stick_x) < 0.3f && fabsf(p.stick_y) < 0.3f && fabsf(p.cstick_x) < 0.3f &&
+		                        fabsf(p.cstick_y) < 0.3f && p.trigger_l < 0.2f && p.trigger_r < 0.2f);
+	}
+
 	void controls()
 	{
 		SmsPad p = pad(0);
@@ -527,8 +557,9 @@ struct MapTeleport : sms::Mod {
 			step = true, nextRepeat = now + 0.12;
 		lastDir = dir;
 
-		const bool choose = (pressed & SMS_PAD_A) || key(kEnter) || key(kSpace);
-		const bool back   = (pressed & (SMS_PAD_B | SMS_PAD_START)) || key(kEscape) || key(kBack) || key(openKey);
+		// (the keyboard and mouse as the port maps them: a left click is A, a right click B, Enter Start)
+		const bool choose = (pressed & SMS_PAD_A) != 0;
+		const bool back   = (pressed & (SMS_PAD_B | SMS_PAD_START)) || key(openKey);
 
 		if (inList) {
 			const Place& pl = places[sel];
@@ -689,7 +720,7 @@ struct MapTeleport : sms::Mod {
 		// what the buttons do
 		char help[128];
 		snprintf(help, sizeof help, "%s", inList ? "Up and down choose   A teleport   B back"
-		                                         : "Move to a level   A choose   B or M close");
+		                                         : "Move to a level   A choose   B close");
 		d.text(cw * 0.5f, my + mapH + 8, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, help);
 	}
 
@@ -697,28 +728,38 @@ struct MapTeleport : sms::Mod {
 
 	int load() override
 	{
-		openKey = bindKey("open_map", "M");
+		openKey = bindKey("open_map", "N");
 		kUp     = input().key_from_name("Up");
 		kDown   = input().key_from_name("Down");
 		kLeft   = input().key_from_name("Left");
 		kRight  = input().key_from_name("Right");
-		kEnter  = input().key_from_name("Return");
-		kSpace  = input().key_from_name("Space");
-		kEscape = input().key_from_name("Escape");
-		kBack   = input().key_from_name("Backspace");
 		static const char* const kButtons[] = {"None", "D-pad up", "Z and D-pad up"};
 		optionChoice("pad_button", "Controller button to open the map", std::vector<const char*>(kButtons, kButtons + 3), 1);
+		optionBool("all_levels", "Every level can be teleported to (not only the ones reached)", false);
 
 		const SmsGameState st = state();
 		if (st.save_file >= 0)
-			loadVisited(SMS_FILES_CURRENT);
+			loadVisited(st.save_file);
 
 		// the save file's levels: read as it is chosen, and each level it goes to
 		on<SmsEvSaveFile>(SMS_EV_SAVE_FILE, [this](SmsEvSaveFile& f) {
+			const SmsFilesApi* fs = files();
 			if (f.what == SMS_SAVE_FILE_LOADED)
 				loadVisited(f.file);
-			else if (f.what == SMS_SAVE_FILE_NEW)
+			else if (f.what == SMS_SAVE_FILE_NEW) { // a new game: none yet
 				visited.clear(), fileLoaded = f.file;
+				if (fs)
+					fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
+			} else if (f.what == SMS_SAVE_FILE_ERASED && fs)
+				fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
+			else if (f.what == SMS_SAVE_FILE_COPIED && fs && f.from >= 0) {
+				static char buf[64 * 1024];
+				const int n = fs->read(handle(), SMS_FILES_MOD, listName(f.from).c_str(), buf, sizeof buf);
+				if (n > 0 && n <= (int)sizeof buf)
+					fs->write(handle(), SMS_FILES_MOD, listName(f.file).c_str(), buf, (uint32_t)n);
+				else
+					fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
+			}
 		});
 		on<SmsEvStage>(SMS_EV_STAGE_LOADED, [this](SmsEvStage& s) {
 			endLeaving();
@@ -729,10 +770,24 @@ struct MapTeleport : sms::Mod {
 			if (sunshineWorlds() && areaKind(s.area) == SMS_AREA_TITLE)
 				return;
 			if (fileLoaded != g.save_file)
-				loadVisited(SMS_FILES_CURRENT), fileLoaded = g.save_file;
+				loadVisited(g.save_file);
 			if (visited.insert(std::make_pair(s.area, s.episode)).second)
 				saveVisited();
 		});
+		// the game (and the other mods) see no controller while the map is up, and after it until
+		// everything is let go (input->capture also kept the keyboard's key-ups from the game: a key
+		// held as it opened stayed held)
+		on<SmsEvPadRead>(SMS_EV_PAD_READ, [this](SmsEvPadRead& r) {
+			if (waitRelease && !shown && !leaving && allLetGo())
+				waitRelease = false;
+			if (!shown && !leaving && !waitRelease)
+				return;
+			for (int i = 0; i < 4; i++) {
+				const int8_t err = r.pads[i].err;
+				memset(&r.pads[i], 0, sizeof r.pads[i]);
+				r.pads[i].err = err;
+			}
+		}, SMS_PRIORITY_EARLY);
 		// nothing hurts him while the map is up
 		on<SmsEvent>(SMS_EV_PLAYER_DAMAGE, [this](SmsEvent&) { return shown || leaving ? SMS_CANCEL : SMS_CONTINUE; });
 
