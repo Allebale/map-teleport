@@ -66,6 +66,56 @@ const float kLand[][3] = {
 // Delfino: their episode follows the story)
 const int kStoryEpisode = 255;
 
+// Super Mario Sunshine's own tables (the decomp's System/StageUtil.cpp and GC2D/ShineTable.hpp), kept
+// here: the game's api->world answers only when no code mod is on, and this works with one on too.
+// An area's world (0 the Airstrip, 1 the plaza, 2 to 8 the seven worlds, 9 Corona Mountain).
+const unsigned char kShineStage[61] = {
+    0, 1, 2, 3, 4, 5, 6, 6, 7, 8, 9, 1, 1, 5, 6, 1, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3,
+    8, 4, 4, 5, 5, 5, 5, 5, 5, 6, 5, 7, 7, 8, 8, 2, 2, 3, 3, 5, 6, 9, 1, 1, 2, 6, 8, 5, 3, 9,
+};
+const int kWorldArea[10] = {0, 1, 2, 3, 4, 5, 6, 8, 9, 52}; // the area each world is entered by
+// each world's eight episodes' Shines (worlds 2 to 8)
+const unsigned char kEpisodeShines[7][8] = {
+    {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}, // Bianco Hills
+    {0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11}, // Ricco Harbor
+    {0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B}, // Gelato Beach
+    {0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25}, // Pinna Park
+    {0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F}, // Sirena Beach
+    {0x3C, 0x41, 0x3E, 0x3D, 0x40, 0x3F, 0x42, 0x43}, // Pianta Village
+    {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39}, // Noki Bay
+};
+int shineStage(int area) { return area >= 0 && area < 61 ? kShineStage[area] : -1; }
+// SMS_AREA_*, as api->world's area_kind
+int areaKind(int area)
+{
+	const int w = shineStage(area);
+	if (w < 0)
+		return SMS_AREA_NONE;
+	if (area == 15)
+		return SMS_AREA_TITLE;
+	if (w == 0)
+		return SMS_AREA_AIRSTRIP;
+	if (w == 9)
+		return SMS_AREA_FINAL;
+	if (area > 0x14 && area < 0x35)
+		return SMS_AREA_SECRET;
+	if (w == 1)
+		return SMS_AREA_PLAZA;
+	const bool entry = area == 2 || area == 3 || area == 4 || area == 5 || area == 6 || area == 8 || area == 9;
+	return entry ? SMS_AREA_WORLD : SMS_AREA_WORLD_PART;
+}
+int worldOf(int area)
+{
+	const int w = shineStage(area);
+	return w >= 0 && w <= 9 && area != 15 ? kWorldArea[w] : -1;
+}
+// a world's episode Shines (by the area it is entered by), or null
+const unsigned char* episodeShines(int area)
+{
+	const int w = shineStage(area);
+	return w >= 2 && w <= 8 && area != 15 ? kEpisodeShines[w - 2] : nullptr;
+}
+
 std::string lower(const std::string& s)
 {
 	std::string o = s;
@@ -124,8 +174,7 @@ struct MapTeleport : sms::Mod {
 	// Super Mario Sunshine's map of its worlds (none in Super Mario Eclipse)
 	bool sunshineWorlds() const
 	{
-		const SmsWorldApi* w = world();
-		return !state().eclipse && w && SMS_API_HAS(w, area_kind) && SMS_API_HAS(w, world_of) && w->area_kind(1) == SMS_AREA_PLAZA;
+		return !state().eclipse;
 	}
 	std::string areaName(int area) const
 	{
@@ -220,14 +269,13 @@ struct MapTeleport : sms::Mod {
 
 	void buildSunshine(std::map<std::string, Place>& by)
 	{
-		const SmsWorldApi* w = world();
 		const SmsGameApi& g  = game();
 		const int shines     = g.shines ? g.shines() : 0;
 		for (int a = 0; a < 255; a++) {
-			const int kind = w->area_kind(a);
+			const int kind = areaKind(a);
 			if (kind == SMS_AREA_NONE || kind == SMS_AREA_TITLE || areaName(a).empty())
 				continue;
-			const int wo = w->world_of(a);
+			const int wo = worldOf(a);
 			const int id = wo >= 0 ? wo : a;
 			char key[16];
 			snprintf(key, sizeof key, "%03d", id);
@@ -245,19 +293,22 @@ struct MapTeleport : sms::Mod {
 			// reached: been there, or a Shine of its episodes had (the plaza and the Airstrip: any Shine)
 			for (size_t i = 0; i < p.areas.size(); i++)
 				p.open = p.open || areaVisited(p.areas[i]);
-			const int episodes = SMS_API_HAS(w, episode_count) ? w->episode_count(wid) : 0;
-			for (int e = 0; e < episodes && !p.open; e++) {
-				const int s = SMS_API_HAS(w, episode_shine) ? w->episode_shine(wid, e) : -1;
-				p.open = s >= 0 && g.has_shine && g.has_shine(s);
-			}
+			const unsigned char* shines8 = episodeShines(wid);
+			const int episodes = shines8 ? 8 : 0;
+			for (int e = 0; e < episodes && !p.open; e++)
+				p.open = g.has_shine && g.has_shine(shines8[e]);
 			if (wid == 1 && shines > 0)
 				p.open = true;
 			if (!p.open)
 				continue;
 			// a world's episodes, as its episode select offers them
 			if (episodes > 0) {
-				int next = SMS_API_HAS(w, next_episode) ? w->next_episode(wid) : 0;
-				next     = next < 0 ? 0 : next >= episodes ? episodes - 1 : next;
+				// the one after the newest whose Shine is had (TSelectMenu::initData)
+				int next = 0;
+				for (int e = 0; e < 8; e++)
+					if (g.has_shine && g.has_shine(shines8[e]))
+						next = e + 1;
+				next = next > 7 ? 7 : next;
 				for (int e = 0; e <= next; e++) {
 					Entry en = {episodeName(wid, e), wid, e};
 					p.entries.push_back(en);
@@ -265,7 +316,7 @@ struct MapTeleport : sms::Mod {
 			}
 			for (size_t i = 0; i < p.areas.size(); i++) {
 				const int a    = p.areas[i];
-				const int kind = w->area_kind(a);
+				const int kind = areaKind(a);
 				if (a == wid && episodes > 0)
 					continue; // its episodes, above
 				if (a == 1 || a == 7 || a == 13 || a == 58) { // the game picks its episode
@@ -343,6 +394,11 @@ struct MapTeleport : sms::Mod {
 			}
 			places.push_back(p);
 		}
+		int reached = 0;
+		for (size_t i = 0; i < places.size(); i++)
+			reached += places[i].open ? 1 : 0;
+		info("map: %s, %d places, %d reached, %d Shines", sunshineWorlds() ? "Super Mario Sunshine" : "Super Mario Eclipse",
+		     (int)places.size(), reached, game().shines ? game().shines() : 0);
 		// start on where Mario is
 		sel = 0;
 		const int here = state().area;
@@ -363,7 +419,7 @@ struct MapTeleport : sms::Mod {
 		const SmsWorldApi* w = world();
 		if (w && SMS_API_HAS(w, cutscene_playing) && w->cutscene_playing())
 			return false;
-		if (sunshineWorlds() && w->area_kind(st.area) == SMS_AREA_TITLE)
+		if (sunshineWorlds() && areaKind(st.area) == SMS_AREA_TITLE)
 			return false;
 		const char* by = input().captured_by ? input().captured_by() : nullptr;
 		return !by;
@@ -670,8 +726,7 @@ struct MapTeleport : sms::Mod {
 			const SmsGameState g = state();
 			if (g.save_file < 0 || s.area < 0 || s.area > 254 || s.episode < 0 || s.episode > 255)
 				return;
-			const SmsWorldApi* w = world();
-			if (sunshineWorlds() && w->area_kind(s.area) == SMS_AREA_TITLE)
+			if (sunshineWorlds() && areaKind(s.area) == SMS_AREA_TITLE)
 				return;
 			if (fileLoaded != g.save_file)
 				loadVisited(SMS_FILES_CURRENT), fileLoaded = g.save_file;
