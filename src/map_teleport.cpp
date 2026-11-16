@@ -948,7 +948,8 @@ struct MapTeleport : sms::Mod {
 		on<SmsEvFrame>(SMS_EV_FRAME, [this](SmsEvFrame&) {
 			const SmsGameState st = state();
 			if (leaving) {
-				if (core().time() - leftAt > 6.0) // the warp never came
+				// the stage left (an episode select is up, or the next stage loading), or the warp never came
+				if (st.mode != SMS_MODE_STAGE || core().time() - leftAt > 6.0)
 					endLeaving();
 				return;
 			}
@@ -966,9 +967,7 @@ struct MapTeleport : sms::Mod {
 		on<SmsEvDraw>(SMS_EV_DRAW, [this](SmsEvDraw& d) {
 			if (shown)
 				drawMap(d.canvas_w, d.canvas_h);
-			else if (leaving)
-				draw().text(d.canvas_w * 0.5f, d.canvas_h * 0.5f, 18, SMS_RGB(255, 255, 255), SMS_TEXT_OUTLINE | SMS_TEXT_CENTER,
-				            "Teleporting");
+
 		});
 
 		info("loaded; %s opens the map", openKey > 0 ? input().key_name(openKey) : "(no key)");
