@@ -1,9 +1,15 @@
 **Map Teleport** opens a map of Isle Delfino in any level and takes Mario straight to any level your save file has reached. It works in both Super Mario Sunshine and Super Mario Eclipse.
 
+## What's new in 1.1.0
+- **Shadow Mario first:** while Shadow Mario waits for you in Delfino Plaza, teleporting takes you to the plaza instead, so the story can't be skipped. In Super Mario Sunshine this covers the Pianta Village, Rocket Nozzle and Turbo Nozzle chases. In Super Mario Eclipse it covers the Rocket Nozzle chase at 25 Shines and the Turbo Nozzle chase at 30 Shines. The plaza shows in orange on the map. It can be turned off in the Mods menu.
+- **B goes back:** pressing **B** in a world's episode select takes you back to the level you teleported from. It can be turned off in the Mods menu.
+- **No openings when going back:** the opening scenes of the episode passed through and of the level you return to are skipped.
+
 ### How it works
 - Press **N** on the keyboard, or **D-pad up** on a controller, to open the map. The controller button can be changed or turned off in the Mods menu (F1).
 - Move between levels with the stick, the D-pad or the arrow keys. **A** (left click) teleports, **B** (right click) closes the map.
-- Choosing a world opens its own episode select, just like going through its painting or pipe. Delfino Plaza and Hotel Delfino follow the story as they do in the game.
+- Choosing a world opens its own episode select, just like going through its painting or pipe. Press **B** there to go back to where you were. Delfino Plaza and Hotel Delfino follow the story as they do in the game.
+- While Shadow Mario waits in Delfino Plaza, every teleport goes there first.
 - The side panel shows a picture of the level, a short description, and in Super Mario Sunshine your Shines and coin record there.
 - Mario can't be hurt while the map is open.
 
