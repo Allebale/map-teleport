@@ -1046,7 +1046,8 @@ struct MapTeleport : sms::Mod {
 			if (shown)
 				drawMap(d.canvas_w, d.canvas_h);
 			if (backArmed && !goingBack && state().mode == SMS_MODE_TITLE)
-				draw().text(d.canvas_w * 0.5f, d.canvas_h - 34.0f, 14, SMS_RGB(255, 255, 255), SMS_TEXT_OUTLINE | SMS_TEXT_CENTER,
+				// bottom right, clear of the select's score
+				draw().text(d.canvas_w - 28.0f, d.canvas_h - 36.0f, 14, SMS_RGB(255, 255, 255), SMS_TEXT_OUTLINE | SMS_TEXT_RIGHT,
 				            "B  Go back");
 
 		});
