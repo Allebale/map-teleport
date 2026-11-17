@@ -223,6 +223,9 @@ struct MapTeleport : sms::Mod {
 	std::vector<Place> places;
 	std::set<std::pair<int, int> > visited; // (area, episode) this save file has been to
 	int fileLoaded = -2;
+	// Super Mario Eclipse's levels it keeps no coin record of (Pianta Pit, the Daisy Cruiser; Corona
+	// Mountain's is Erto Rock's there): the mod's own, by the level's main area
+	std::map<int, int> ownRecords;
 
 	// ---------------------------------------------------------- the game
 
@@ -257,8 +260,75 @@ struct MapTeleport : sms::Mod {
 		snprintf(n, sizeof n, "visited-%s-%c.txt", state().eclipse ? "eclipse" : "sunshine", 'a' + (file & 3));
 		return n;
 	}
+	std::string recordsName(int file) const
+	{
+		char n[48];
+		snprintf(n, sizeof n, "coin-records-eclipse-%c.txt", 'a' + (file & 3));
+		return n;
+	}
+	void loadRecords(int file)
+	{
+		ownRecords.clear();
+		const SmsFilesApi* f = files();
+		if (!f || file < 0 || file > 2 || !state().eclipse)
+			return;
+		char buf[1024];
+		int n = f->read(handle(), SMS_FILES_MOD, recordsName(file).c_str(), buf, sizeof buf - 1);
+		if (n <= 0)
+			return;
+		if (n > (int)sizeof buf - 1)
+			n = sizeof buf - 1;
+		buf[n] = 0;
+		const char* p = buf;
+		int a, c, used;
+		while (sscanf(p, "%d %d%n", &a, &c, &used) == 2) {
+			if (a >= 0 && a < 255 && c >= 0 && c < 1000)
+				ownRecords[a] = c;
+			p += used;
+		}
+	}
+	void saveRecords()
+	{
+		const SmsFilesApi* f = files();
+		if (!f || fileLoaded < 0 || fileLoaded > 2)
+			return;
+		std::string s;
+		char line[32];
+		for (std::map<int, int>::const_iterator i = ownRecords.begin(); i != ownRecords.end(); ++i) {
+			snprintf(line, sizeof line, "%d %d\n", i->first, i->second);
+			s += line;
+		}
+		f->write(handle(), SMS_FILES_MOD, recordsName(fileLoaded).c_str(), s.data(), (uint32_t)s.size());
+	}
+	// the level an area is part of, when the mod keeps its coin record (-1 the game keeps it, or none)
+	int ownRecordArea(int area) const
+	{
+		if (!state().eclipse)
+			return -1;
+		if (areaKind(area) == SMS_AREA_FINAL)
+			return 52;
+		const EclipseLevel* lv = eclipseLevel(area);
+		return lv && lv->record < 0 ? lv->areas[0] : -1;
+	}
+	// in a level whose record the mod keeps: the coins of this visit, a new record kept
+	void trackCoins(const SmsGameState& st)
+	{
+		const int key = st.stage_ready && st.save_file >= 0 && game().coins ? ownRecordArea(st.area) : -1;
+		if (key < 0)
+			return;
+		const int coins = game().coins();
+		std::map<int, int>::iterator it = ownRecords.find(key);
+		if (it != ownRecords.end() && coins <= it->second)
+			return;
+		if (fileLoaded != st.save_file)
+			loadVisited(st.save_file);
+		ownRecords[key] = coins;
+		saveRecords();
+	}
+
 	void loadVisited(int file)
 	{
+		loadRecords(file);
 		visited.clear();
 		fileLoaded = file;
 		const SmsFilesApi* f = files();
@@ -905,9 +975,14 @@ struct MapTeleport : sms::Mod {
 		d.clip_pop();
 	}
 
-	// A level's Shines on the file, of how many (0: it has none), and its coin record (-1 none to show,
-	// -2 the game keeps none): Super Mario
+	// A level's Shines on the file, of how many (0: it has none), and its coin record (-1 none to show;
+	// the mod's own where Eclipse keeps none): Super Mario
 	// Sunshine's seven worlds, and in Super Mario Eclipse those and its own levels. False: none to show.
+	int ownRecord(int key) const
+	{
+		std::map<int, int>::const_iterator it = ownRecords.find(key);
+		return it != ownRecords.end() ? it->second : 0;
+	}
 	bool levelRecord(const Place& pl, int& had, int& total, int& record) const
 	{
 		const SmsGameApi& g = game();
@@ -946,7 +1021,7 @@ struct MapTeleport : sms::Mod {
 			return true;
 		}
 		if (corona) {
-			record = sunshineWorlds() ? (int)g.flag_get(0x20005u + 9) : -1;
+			record = sunshineWorlds() ? (int)g.flag_get(0x20005u + 9) : ownRecord(52);
 			return true;
 		}
 		if (sunshineWorlds())
@@ -960,7 +1035,7 @@ struct MapTeleport : sms::Mod {
 			had += g.flag_get(shineFlag(lv->first + i)) ? 1 : 0;
 		had += g.flag_get(shineFlag(lv->coins)) ? 1 : 0;
 		total = lv->n + 1;
-		record = lv->record >= 0 ? (int)g.flag_get(0x20005u + (uint32_t)lv->record) : -2;
+		record = lv->record >= 0 ? (int)g.flag_get(0x20005u + (uint32_t)lv->record) : ownRecord(lv->areas[0]);
 		return true;
 	}
 
@@ -1062,11 +1137,13 @@ struct MapTeleport : sms::Mod {
 			if (f.what == SMS_SAVE_FILE_LOADED)
 				loadVisited(f.file);
 			else if (f.what == SMS_SAVE_FILE_NEW) { // a new game: none yet
-				visited.clear(), fileLoaded = f.file;
+				visited.clear(), ownRecords.clear(), fileLoaded = f.file;
 				if (fs)
-					fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
+					fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str()),
+					    fs->remove(handle(), SMS_FILES_MOD, recordsName(f.file).c_str());
 			} else if (f.what == SMS_SAVE_FILE_ERASED && fs)
-				fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
+				fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str()),
+				    fs->remove(handle(), SMS_FILES_MOD, recordsName(f.file).c_str());
 			else if (f.what == SMS_SAVE_FILE_COPIED && fs && f.from >= 0) {
 				static char buf[64 * 1024];
 				const int n = fs->read(handle(), SMS_FILES_MOD, listName(f.from).c_str(), buf, sizeof buf);
@@ -1074,6 +1151,12 @@ struct MapTeleport : sms::Mod {
 					fs->write(handle(), SMS_FILES_MOD, listName(f.file).c_str(), buf, (uint32_t)n);
 				else
 					fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
+				char rec[1024];
+				const int m = fs->read(handle(), SMS_FILES_MOD, recordsName(f.from).c_str(), rec, sizeof rec);
+				if (m > 0 && m <= (int)sizeof rec)
+					fs->write(handle(), SMS_FILES_MOD, recordsName(f.file).c_str(), rec, (uint32_t)m);
+				else
+					fs->remove(handle(), SMS_FILES_MOD, recordsName(f.file).c_str());
 			}
 		});
 		// the opening over: nothing more to skip
@@ -1177,6 +1260,8 @@ struct MapTeleport : sms::Mod {
 
 		on<SmsEvFrame>(SMS_EV_FRAME, [this](SmsEvFrame&) {
 			const SmsGameState st = state();
+			if (st.mode == SMS_MODE_STAGE)
+				trackCoins(st);
 			if (leaving) {
 				// the stage left (an episode select is up, or the next stage loading), or the warp never came
 				if (st.mode != SMS_MODE_STAGE || core().time() - leftAt > 6.0)
