@@ -485,6 +485,10 @@ struct MapTeleport : sms::Mod {
 			reached += places[i].open ? 1 : 0;
 		info("map: %s, %d places, %d reached, %d Shines", sunshineWorlds() ? "Super Mario Sunshine" : "Super Mario Eclipse",
 		     (int)places.size(), reached, game().shines ? game().shines() : 0);
+		if (game().flag_get)
+			info("Shadow Mario in the plaza: %s (Rocket Nozzle %d, Turbo Nozzle %d, story %d %d %d)", shadowMarioWaits() ? "waits" : "no",
+			     (int)game().flag_get(0x10367u), (int)game().flag_get(0x10366u), (int)game().flag_get(0x10389u),
+			     (int)game().flag_get(0x1038Fu), (int)game().flag_get(0x103AEu));
 		// start on where Mario is
 		sel = 0;
 		const int here = state().area;
@@ -535,11 +539,18 @@ struct MapTeleport : sms::Mod {
 	// Super Mario Sunshine: Shadow Mario waits in Delfino Plaza for a chase (TMarDirector::setupObjects,
 	// the plaza's story at its episode 8 as decideNextScenario picks it: the chase after Shine 33 that
 	// opens Pianta Village, then the Rocket Nozzle's at 25 Shines and the Turbo Nozzle's at 30)
+	// Super Mario Eclipse keeps the nozzle chases (the Rocket Nozzle's at 25 Shines, the Turbo Nozzle's at
+	// 30) but has its own plaza story and Shines: only the nozzles and the Shine count are read there.
 	bool shadowMarioWaits() const
 	{
 		const SmsGameApi& g = game();
-		if (!sunshineWorlds() || !g.flag_get || !g.has_shine)
+		if (!g.flag_get || !g.has_shine)
 			return false;
+		if (!sunshineWorlds()) {
+			const int shines = (int)g.flag_get(0x40000u);
+			const bool rocket = g.flag_get(0x10367u) != 0, turbo = g.flag_get(0x10366u) != 0;
+			return (!rocket && shines >= 25) || (rocket && !turbo && shines >= 30);
+		}
 		if (g.flag_get(0x103AEu) || !g.flag_get(0x10389u))
 			return false; // the plaza's story is past them, or not there yet
 		static const int kChases[7] = {0x06, 0x10, 0x1A, 0x24, 0x2E, 0x38, 0x42};

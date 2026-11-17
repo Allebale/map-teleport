@@ -13,7 +13,8 @@ the file has a Shine of. They are kept for each save file of each game, at once.
 
 Shadow Mario: in Super Mario Sunshine, while he waits in Delfino Plaza for a chase (the one that opens Pianta
 Village, and the Rocket and Turbo Nozzles' at 25 and 30 Shines), teleporting takes you to the plaza instead, so
-the chase isn't missed. The map says so. A setting turns it off.
+the chase isn't missed. In Super Mario Eclipse the same goes for the nozzle chases at 25 and 30 Shines. The map
+says so. A setting turns it off.
 
 Going back: B in the episode select a teleport opened takes you back to where you were. The game has no way
 back from it, so the mod picks the episode on the cursor and teleports back as soon as it loads (a short load
