@@ -11,6 +11,10 @@ in a stage and teleport to any level your save file has reached.
 Which levels: the ones this save file has been to since the mod was on, and in Super Mario Sunshine every world
 the file has a Shine of. They are kept for each save file of each game, at once. A setting opens every level.
 
+Shadow Mario: in Super Mario Sunshine, while he waits in Delfino Plaza for a chase (the one that opens Pianta
+Village, and the Rocket and Turbo Nozzles' at 25 and 30 Shines), teleporting takes you to the plaza instead, so
+the chase isn't missed. The map says so. A setting turns it off.
+
 Build: `cmake -S . -B build -DSMS_MODS_OUT=<the game's mods folder> && cmake --build build`.
 
 ## Credits

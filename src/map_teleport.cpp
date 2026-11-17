@@ -522,8 +522,39 @@ struct MapTeleport : sms::Mod {
 		if (!quiet)
 			sound(SMS_SOUND_CANCEL);
 	}
-	void teleport(const Entry& e)
+	// Super Mario Sunshine: Shadow Mario waits in Delfino Plaza for a chase (TMarDirector::setupObjects,
+	// the plaza's story at its episode 8 as decideNextScenario picks it: the chase after Shine 33 that
+	// opens Pianta Village, then the Rocket Nozzle's at 25 Shines and the Turbo Nozzle's at 30)
+	bool shadowMarioWaits() const
 	{
+		const SmsGameApi& g = game();
+		if (!sunshineWorlds() || !g.flag_get || !g.has_shine)
+			return false;
+		if (g.flag_get(0x103AEu) || !g.flag_get(0x10389u))
+			return false; // the plaza's story is past them, or not there yet
+		static const int kChases[7] = {0x06, 0x10, 0x1A, 0x24, 0x2E, 0x38, 0x42};
+		bool allBeaten = true;
+		for (int i = 0; i < 7; i++)
+			allBeaten = allBeaten && g.has_shine(kChases[i]);
+		if (allBeaten)
+			return false;
+		const int shines = (int)g.flag_get(0x40000u);
+		const bool village = g.flag_get(0x1038Fu) != 0, rocket = g.flag_get(0x10367u) != 0, turbo = g.flag_get(0x10366u) != 0;
+		return (!village && g.has_shine(33)) || (!rocket && village && shines >= 25) || (!turbo && rocket && shines >= 30);
+	}
+	bool shadowMarioFirst() const { return setting("shadow_mario", 1) != 0 && shadowMarioWaits(); }
+
+	void teleport(Entry e)
+	{
+		// Shadow Mario waits in the plaza: there first, so his chase isn't missed
+		if (shadowMarioFirst() && e.area != 1) {
+			if (state().area == 1) {
+				sound(SMS_SOUND_DAMAGE);
+				return;
+			}
+			info("Shadow Mario waits in Delfino Plaza: going there instead of area %d", e.area);
+			e = Entry{"Delfino Plaza", 1, kStoryEpisode};
+		}
 		if (!game().warp || !game().warp(e.area, e.episode)) {
 			sound(SMS_SOUND_DAMAGE);
 			return;
@@ -876,6 +907,10 @@ struct MapTeleport : sms::Mod {
 		char help[128];
 		snprintf(help, sizeof help, "%s", "Move to a level   A teleport   B close");
 		d.text(cw * 0.5f, my + mapH + 8, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, help);
+		if (shadowMarioFirst())
+			d.text(cw * 0.5f, my + mapH + 26, 12, SMS_RGB(255, 170, 90), SMS_TEXT_SHADOW | SMS_TEXT_CENTER,
+			       state().area == 1 ? "Shadow Mario is here in Delfino Plaza. Catch him first"
+			                         : "Shadow Mario is in Delfino Plaza. Teleporting takes you there until you catch him");
 	}
 
 	// ---------------------------------------------------------- the mod
@@ -890,6 +925,7 @@ struct MapTeleport : sms::Mod {
 		static const char* const kButtons[] = {"None", "D-pad up", "Z and D-pad up"};
 		optionChoice("pad_button", "Controller button to open the map", std::vector<const char*>(kButtons, kButtons + 3), 1);
 		optionBool("all_levels", "Every level can be teleported to (not only the ones reached)", false);
+		optionBool("shadow_mario", "Go to Delfino Plaza first while Shadow Mario waits there", true);
 
 		const SmsGameState st = state();
 		if (st.save_file >= 0)
