@@ -1,9 +1,12 @@
 **Map Teleport** opens a map of Isle Delfino in any level and takes Mario straight to any level your save file has reached. It works in both Super Mario Sunshine and Super Mario Eclipse.
 
+## What's new in 1.1.1
+- **Straight back:** pressing **B** in a world's episode select now takes you straight back to the level you teleported from. The episode under the cursor no longer loads on the way, so there is no extra loading and no extra opening scene.
+
 ## What's new in 1.1.0
 - **Shadow Mario first:** while Shadow Mario waits for you in Delfino Plaza, teleporting takes you to the plaza instead, so the story can't be skipped. In Super Mario Sunshine this covers the Pianta Village, Rocket Nozzle and Turbo Nozzle chases. In Super Mario Eclipse it covers the Rocket Nozzle chase at 25 Shines and the Turbo Nozzle chase at 30 Shines. The plaza shows in orange on the map. It can be turned off in the Mods menu.
 - **B goes back:** pressing **B** in a world's episode select takes you back to the level you teleported from. It can be turned off in the Mods menu.
-- **No openings when going back:** the opening scenes of the episode passed through and of the level you return to are skipped.
+- **No openings when going back:** the opening scene of the level you return to is skipped.
 
 ### How it works
 - Press **N** on the keyboard, or **D-pad up** on a controller, to open the map. The controller button can be changed or turned off in the Mods menu (F1).
