@@ -17,8 +17,9 @@ the chase isn't missed. In Super Mario Eclipse the same goes for the nozzle chas
 says so. A setting turns it off.
 
 Going back: B in the episode select a teleport opened takes you back to where you were. The game has no way
-back from it, so the mod picks the episode on the cursor and teleports back as soon as it loads (a short load
-there and back, their openings skipped). A setting turns it off.
+back from it, so the mod closes it and loads the level you came from in place of the episode chosen (its
+opening skipped; a game without SMS_EV_STAGE_LOADING loads the episode and teleports back from it). A setting
+turns it off.
 
 Build: `cmake -S . -B build -DSMS_MODS_OUT=<the game's mods folder> && cmake --build build`.
 

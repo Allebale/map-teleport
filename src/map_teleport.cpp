@@ -982,10 +982,22 @@ struct MapTeleport : sms::Mod {
 			if (!returning)
 				skipping = false;
 		});
+		// the episode select closed for going back: the stage left loads in place of the episode chosen,
+		// so none is passed through (a game without this event: warped back from it, below)
+		on<SmsEvStageLoading>(SMS_EV_STAGE_LOADING, [this](SmsEvStageLoading& l) {
+			if (!goingBack)
+				return;
+			info("back from the episode select to area %d, episode %d (instead of %d, %d)", backArea, backEpisode,
+			     l.area, l.episode);
+			l.area = backArea, l.episode = backEpisode;
+		});
 		on<SmsEvStage>(SMS_EV_STAGE_LOADED, [this](SmsEvStage& s) {
 			endLeaving();
 			shown = false;
-			if (goingBack) { // the episode select closed for going back: straight on to the stage left
+			if (goingBack && s.area == backArea && s.episode == backEpisode) { // back already: its opening skipped
+				goingBack = backArmed = false;
+				skipping = true, skipFrom = core().time(), pressFrames = 0;
+			} else if (goingBack) { // the episode select closed for going back: straight on to the stage left
 				goingBack = backArmed = false;
 				if (game().warp && game().warp(backArea, backEpisode)) {
 					info("back from the episode select to area %d, episode %d", backArea, backEpisode);
