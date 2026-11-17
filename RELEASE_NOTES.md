@@ -13,7 +13,7 @@
 - Move between levels with the stick, the D-pad or the arrow keys. **A** (left click) teleports, **B** (right click) closes the map.
 - Choosing a world opens its own episode select, just like going through its painting or pipe. Press **B** there to go back to where you were. Delfino Plaza and Hotel Delfino follow the story as they do in the game.
 - While Shadow Mario waits in Delfino Plaza, every teleport goes there first.
-- The side panel shows a picture of the level, a short description, and in Super Mario Sunshine your Shines and coin record there.
+- The side panel shows a picture of the level, a short description, and your Shines and coin record there (in Super Mario Eclipse too, for its own levels as well).
 - Mario can't be hurt while the map is open.
 
 ### Which levels you can go to

@@ -130,6 +130,46 @@ const unsigned char* episodeShines(int area)
 	return w >= 2 && w <= 8 && area != 15 ? kEpisodeShines[w - 2] : nullptr;
 }
 
+// Super Mario Eclipse's own levels (its src/stage.cpp, initializeStageInfo, v1.1): their areas (not the
+// secret courses: they are places of their own on the map), their
+// Shines (the episodes', then the 100 coins' and the others its episode select shows) and their coin
+// record (src/stage/record.cpp: flag 0x20005 + it; -1 none kept: Pianta Pit, the Daisy Cruiser)
+struct EclipseLevel {
+	unsigned char areas[6];  // 0 ends
+	unsigned char first, n;  // Shines first .. first + n - 1
+	unsigned char coins;     // its 100 coins' Shine
+	signed char record;
+};
+const EclipseLevel kEclipseLevels[] = {
+    {{61}, 120, 10, 207, 9},              // Erto Rock
+    {{62, 79}, 130, 10, 208, 10},         // Lighthouse Island
+    {{63}, 140, 10, 209, 11},             // Warship Island
+    {{64, 65, 66}, 150, 10, 210, 12}, // Hotel Lacrima
+    {{67}, 160, 6, 211, -1},                  // Pianta Pit
+    {{68}, 166, 5, 212, -1},              // the Daisy Cruiser
+    {{69}, 171, 4, 213, 16},                  // Mario's Dream
+    {{70}, 175, 4, 214, 17},              // Lancia Fredda
+    {{71}, 179, 4, 215, 18},              // Vaporwave
+    {{72}, 183, 4, 216, 19},              // Yoshi Village
+    {{74}, 187, 4, 217, 20},              // Red Lily City
+    {{75}, 191, 4, 218, 21},              // Peach Beach
+    {{76}, 195, 4, 219, 22},              // Spettro Casino
+};
+const EclipseLevel* eclipseLevel(int area)
+{
+	for (size_t i = 0; i < sizeof kEclipseLevels / sizeof *kEclipseLevels; i++)
+		for (int j = 0; j < 6 && kEclipseLevels[i].areas[j]; j++)
+			if (kEclipseLevels[i].areas[j] == area)
+				return &kEclipseLevels[i];
+	return nullptr;
+}
+// a Shine's flag: Better Sunshine Engine keeps those past the game's 120 elsewhere (its
+// shine/extendcount.cpp, shineGetClamper)
+uint32_t shineFlag(int shine)
+{
+	return shine < 0x78 ? 0x10000u + (uint32_t)shine : 0x60040u + (uint32_t)(shine - 0x78);
+}
+
 std::string lower(const std::string& s)
 {
 	std::string o = s;
@@ -840,29 +880,63 @@ struct MapTeleport : sms::Mod {
 		       pl.open ? "A to teleport here" : "Not reached yet");
 		y += 20;
 
-		// Super Mario Sunshine: its Shines and coin record
-		if (sunshineWorlds()) {
-			const SmsGameApi& g = game();
-			if (const unsigned char* ep = episodeShines(pl.world)) {
-				const unsigned char* etc = kEtcShines[shineStage(pl.world) - 2];
-				int had = 0;
-				for (int i = 0; i < 8; i++)
-					had += g.has_shine && g.has_shine(ep[i]) ? 1 : 0;
-				for (int i = 0; i < 3; i++)
-					had += g.has_shine && g.has_shine(etc[i]) ? 1 : 0;
-				char line[64];
-				snprintf(line, sizeof line, "Shines  %d of 11", had);
-				d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
-				y += 17;
-				const int record = g.flag_get ? (int)g.flag_get(0x20005u + (uint32_t)pl.world) : 0;
+		// its Shines and coin record
+		int had = 0, total = 0, record = -1;
+		if (levelRecord(pl, had, total, record)) {
+			char line[64];
+			snprintf(line, sizeof line, "Shines  %d of %d", had, total);
+			d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
+			y += 17;
+			if (record >= 0) {
 				snprintf(line, sizeof line, "Coin record  %d", record);
 				d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
-				y += 21;
+				y += 17;
 			}
+			y += 4;
 		}
 		if (const char* a = about(pl.name))
 			y = wrapText(px + 12, y, pw - 24, 11, SMS_RGB(190, 200, 220), a);
 		d.clip_pop();
+	}
+
+	// A level's Shines on the file, of how many, and its coin record (-1 none kept): Super Mario
+	// Sunshine's seven worlds, and in Super Mario Eclipse those and its own levels. False: none to show.
+	bool levelRecord(const Place& pl, int& had, int& total, int& record) const
+	{
+		const SmsGameApi& g = game();
+		if (!g.flag_get)
+			return false;
+		had = total = 0, record = -1;
+		// Super Mario Sunshine's worlds, in either game (Eclipse keeps their Shines and records)
+		int area = sunshineWorlds() ? pl.world : -1;
+		for (size_t i = 0; area < 0 && i < pl.areas.size(); i++) // Eclipse: the world's way in (not the hotel)
+			if (areaKind(pl.areas[i]) == SMS_AREA_WORLD)
+				area = pl.areas[i];
+		if (const unsigned char* ep = area >= 0 && area < 61 ? episodeShines(area) : nullptr) {
+			const int stage           = shineStage(area);
+			const unsigned char* etc = kEtcShines[stage - 2];
+			for (int i = 0; i < 8; i++)
+				had += g.flag_get(shineFlag(ep[i])) ? 1 : 0;
+			for (int i = 0; i < 3; i++)
+				had += g.flag_get(shineFlag(etc[i])) ? 1 : 0;
+			total  = 11;
+			record = (int)g.flag_get(0x20005u + (uint32_t)stage); // as the episode select reads it
+			return true;
+		}
+		if (sunshineWorlds())
+			return false;
+		const EclipseLevel* lv = nullptr;
+		for (size_t i = 0; i < pl.areas.size() && !lv; i++)
+			lv = eclipseLevel(pl.areas[i]);
+		if (!lv)
+			return false;
+		for (int i = 0; i < lv->n; i++)
+			had += g.flag_get(shineFlag(lv->first + i)) ? 1 : 0;
+		had += g.flag_get(shineFlag(lv->coins)) ? 1 : 0;
+		total = lv->n + 1;
+		if (lv->record >= 0)
+			record = (int)g.flag_get(0x20005u + (uint32_t)lv->record);
+		return true;
 	}
 
 	void drawMap(float cw, float ch)
