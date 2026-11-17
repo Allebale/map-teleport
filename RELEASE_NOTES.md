@@ -4,7 +4,7 @@
 - **Straight back:** pressing **B** in a world's episode select now takes you straight back to the level you teleported from. The episode under the cursor no longer loads on the way, so there is no extra loading and no extra opening scene.
 
 ## What's new in 1.1.0
-- **Shadow Mario first:** while Shadow Mario waits for you in Delfino Plaza, teleporting takes you to the plaza instead, so the story can't be skipped. In Super Mario Sunshine this covers the Pianta Village, Rocket Nozzle and Turbo Nozzle chases. In Super Mario Eclipse it covers the Rocket Nozzle chase at 25 Shines and the Turbo Nozzle chase at 30 Shines. The plaza shows in orange on the map. It can be turned off in the Mods menu.
+- **Shadow Mario first:** while Shadow Mario waits for you in Delfino Plaza, teleporting takes you to the plaza instead, so the story can't be skipped. In Super Mario Sunshine this covers the Yoshi's Egg chase (after Pinna Park episode 4), the Turbo Nozzle chase at 25 Shines and the Rocket Nozzle chase at 30 Shines. In Super Mario Eclipse it covers the nozzle chases at 25 and 30 Shines. The plaza shows in orange on the map. It can be turned off in the Mods menu.
 - **B goes back:** pressing **B** in a world's episode select takes you back to the level you teleported from. It can be turned off in the Mods menu.
 - **No openings when going back:** the opening scene of the level you return to is skipped.
 
