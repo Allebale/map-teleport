@@ -1,5 +1,12 @@
 **Map Teleport** opens a map of Isle Delfino in any level and takes Mario straight to any level your save file has reached. It works in both Super Mario Sunshine and Super Mario Eclipse.
 
+## What's new in 1.1.2
+- **Shines and coin records in Super Mario Eclipse:** the side panel now shows how many Shines you have in each level and its coin record, in Eclipse's own levels too (Erto Rock, Lighthouse Island, Warship Island, Hotel Lacrima, Pianta Pit, the Daisy Cruiser and its worlds).
+- **Delfino Airstrip and Corona Mountain:** the side panel now shows their Shine and coin record as well.
+- **Coin records Eclipse doesn't keep:** for Pianta Pit, the Daisy Cruiser and Corona Mountain, Eclipse saves no coin record of its own, so the mod keeps one for each save file. It counts from this version on.
+- **Fixed:** in Super Mario Sunshine, Pianta Village showed Noki Bay's coin record and Noki Bay showed none.
+- **Fixed:** the Shadow Mario chases now have their right names in the description and the log (Yoshi's Egg, then the Turbo Nozzle at 25 Shines and the Rocket Nozzle at 30).
+
 ## What's new in 1.1.1
 - **Straight back:** pressing **B** in a world's episode select now takes you straight back to the level you teleported from. The episode under the cursor no longer loads on the way, so there is no extra loading and no extra opening scene.
 
