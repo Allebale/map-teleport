@@ -171,6 +171,10 @@ struct MapTeleport : sms::Mod {
 	int backArea = -1, backEpisode = -1;
 	bool backArmed = false, goingBack = false, bHeld = true;
 	int pressFrames = 0;
+	// going back: the openings of the episode passed through and of the stage gone back to are skipped
+	// (B pressed for the player, as skipping one by hand, until the stage starts); returning: on the way
+	bool skipping = false, returning = false;
+	double skipFrom = 0;
 	int sel = 0;
 	std::map<std::string, SmsImage> pictures; // each level's picture (0: none), loaded once
 	int lastDir = 0;
@@ -962,6 +966,11 @@ struct MapTeleport : sms::Mod {
 					fs->remove(handle(), SMS_FILES_MOD, listName(f.file).c_str());
 			}
 		});
+		// the opening over: nothing more to skip
+		on<SmsEvStage>(SMS_EV_STAGE_START, [this](SmsEvStage&) {
+			if (!returning)
+				skipping = false;
+		});
 		on<SmsEvStage>(SMS_EV_STAGE_LOADED, [this](SmsEvStage& s) {
 			endLeaving();
 			shown = false;
@@ -970,7 +979,11 @@ struct MapTeleport : sms::Mod {
 				if (game().warp && game().warp(backArea, backEpisode)) {
 					info("back from the episode select to area %d, episode %d", backArea, backEpisode);
 					leaving = true, leftAt = core().time();
+					skipping = returning = true, skipFrom = core().time(), pressFrames = 0;
 				}
+			} else if (returning) { // back: its opening skipped too
+				returning = false;
+				skipping = true, skipFrom = core().time(), pressFrames = 0;
 			} else
 				backArmed = false; // an episode chosen: here to stay
 			const SmsGameState g = state();
@@ -987,6 +1000,23 @@ struct MapTeleport : sms::Mod {
 		// everything is let go (input->capture also kept the keyboard's key-ups from the game: a key
 		// held as it opened stayed held)
 		on<SmsEvPadRead>(SMS_EV_PAD_READ, [this](SmsEvPadRead& r) {
+			// going back: the openings skipped with B, pressed and let go in turn (none for long: a few
+			// openings can't be skipped)
+			if (skipping) {
+				if (core().time() - skipFrom > 12.0)
+					skipping = false;
+				else {
+					for (int i = 0; i < 4; i++) {
+						const int8_t err = r.pads[i].err;
+						memset(&r.pads[i], 0, sizeof r.pads[i]);
+						r.pads[i].err = err;
+					}
+					if ((pressFrames++ / 3) % 2 == 0)
+						r.pads[0].buttons = SMS_PAD_B;
+					r.pads[0].err = 0;
+					return;
+				}
+			}
 			// the episode select a teleport opened: B (pressed anew) goes back, A closing it for us
 			if (backArmed && state().mode == SMS_MODE_TITLE) {
 				bool b = false;
