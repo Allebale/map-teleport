@@ -165,6 +165,12 @@ struct MapTeleport : sms::Mod {
 	bool shown   = false; // the map is up
 	bool leaving = false; // a teleport asked: the controls kept until the stage changes
 	double leftAt = 0;
+	// Going back from an episode select a teleport opened: the stage it left, while the select may still
+	// be up (backArmed); B pressed there (goingBack): the game has no way back, so the select is closed
+	// with A (the episode on its cursor) and, the moment that episode loads, a teleport back is asked
+	int backArea = -1, backEpisode = -1;
+	bool backArmed = false, goingBack = false, bHeld = true;
+	int pressFrames = 0;
 	int sel = 0;
 	std::map<std::string, SmsImage> pictures; // each level's picture (0: none), loaded once
 	int lastDir = 0;
@@ -560,6 +566,10 @@ struct MapTeleport : sms::Mod {
 			return;
 		}
 		info("teleport to area %d, episode %d (%s)", e.area, e.episode, e.label.c_str());
+		const SmsGameState here = state();
+		backArea = here.area, backEpisode = here.episode;
+		backArmed = setting("go_back", 1) != 0 && backArea >= 0 && backEpisode >= 0 && backArea != e.area;
+		goingBack = false, bHeld = true;
 		sound(SMS_SOUND_DECIDE);
 		shown   = false;
 		leaving = true; // the controls stay ours until the stage changes (no jump from the A held)
@@ -926,6 +936,7 @@ struct MapTeleport : sms::Mod {
 		optionChoice("pad_button", "Controller button to open the map", std::vector<const char*>(kButtons, kButtons + 3), 1);
 		optionBool("all_levels", "Every level can be teleported to (not only the ones reached)", false);
 		optionBool("shadow_mario", "Go to Delfino Plaza first while Shadow Mario waits there", true);
+		optionBool("go_back", "B in the episode select goes back to where you teleported from", true);
 
 		const SmsGameState st = state();
 		if (st.save_file >= 0)
@@ -954,6 +965,14 @@ struct MapTeleport : sms::Mod {
 		on<SmsEvStage>(SMS_EV_STAGE_LOADED, [this](SmsEvStage& s) {
 			endLeaving();
 			shown = false;
+			if (goingBack) { // the episode select closed for going back: straight on to the stage left
+				goingBack = backArmed = false;
+				if (game().warp && game().warp(backArea, backEpisode)) {
+					info("back from the episode select to area %d, episode %d", backArea, backEpisode);
+					leaving = true, leftAt = core().time();
+				}
+			} else
+				backArmed = false; // an episode chosen: here to stay
 			const SmsGameState g = state();
 			if (g.save_file < 0 || s.area < 0 || s.area > 254 || s.episode < 0 || s.episode > 255)
 				return;
@@ -968,6 +987,29 @@ struct MapTeleport : sms::Mod {
 		// everything is let go (input->capture also kept the keyboard's key-ups from the game: a key
 		// held as it opened stayed held)
 		on<SmsEvPadRead>(SMS_EV_PAD_READ, [this](SmsEvPadRead& r) {
+			// the episode select a teleport opened: B (pressed anew) goes back, A closing it for us
+			if (backArmed && state().mode == SMS_MODE_TITLE) {
+				bool b = false;
+				for (int i = 0; i < 4; i++)
+					b = b || (r.pads[i].err == 0 && (r.pads[i].buttons & SMS_PAD_B));
+				if (!goingBack && b && !bHeld) {
+					goingBack = true, pressFrames = 0;
+					sound(SMS_SOUND_CANCEL);
+				}
+				bHeld = b;
+				if (goingBack) {
+					for (int i = 0; i < 4; i++) {
+						const int8_t err = r.pads[i].err;
+						memset(&r.pads[i], 0, sizeof r.pads[i]);
+						r.pads[i].err = err;
+					}
+					// A pressed and let go in turn, until the select takes it
+					if ((pressFrames++ / 3) % 2 == 0)
+						r.pads[0].buttons = SMS_PAD_A;
+					r.pads[0].err = 0;
+					return;
+				}
+			}
 			if (waitRelease && !shown && !leaving && allLetGo())
 				waitRelease = false;
 			if (!shown && !leaving && !waitRelease)
@@ -1003,6 +1045,9 @@ struct MapTeleport : sms::Mod {
 		on<SmsEvDraw>(SMS_EV_DRAW, [this](SmsEvDraw& d) {
 			if (shown)
 				drawMap(d.canvas_w, d.canvas_h);
+			if (backArmed && !goingBack && state().mode == SMS_MODE_TITLE)
+				draw().text(d.canvas_w * 0.5f, d.canvas_h - 34.0f, 14, SMS_RGB(255, 255, 255), SMS_TEXT_OUTLINE | SMS_TEXT_CENTER,
+				            "B  Go back");
 
 		});
 
