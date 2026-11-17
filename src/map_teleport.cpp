@@ -884,12 +884,18 @@ struct MapTeleport : sms::Mod {
 		int had = 0, total = 0, record = -1;
 		if (levelRecord(pl, had, total, record)) {
 			char line[64];
-			snprintf(line, sizeof line, "Shines  %d of %d", had, total);
+			if (total > 0)
+				snprintf(line, sizeof line, "Shines  %d of %d", had, total);
+			else
+				snprintf(line, sizeof line, "No Shines here");
 			d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
 			y += 17;
-			if (record >= 0) {
-				snprintf(line, sizeof line, "Coin record  %d", record);
-				d.text(px + 12, y, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW, line);
+			if (record != -1) {
+				if (record >= 0)
+					snprintf(line, sizeof line, "Coin record  %d", record);
+				else
+					snprintf(line, sizeof line, "No coin record kept here");
+				d.text(px + 12, y, 12, record >= 0 ? SMS_RGB(255, 255, 255) : SMS_RGB(170, 170, 180), SMS_TEXT_SHADOW, line);
 				y += 17;
 			}
 			y += 4;
@@ -899,7 +905,8 @@ struct MapTeleport : sms::Mod {
 		d.clip_pop();
 	}
 
-	// A level's Shines on the file, of how many, and its coin record (-1 none kept): Super Mario
+	// A level's Shines on the file, of how many (0: it has none), and its coin record (-1 none to show,
+	// -2 the game keeps none): Super Mario
 	// Sunshine's seven worlds, and in Super Mario Eclipse those and its own levels. False: none to show.
 	bool levelRecord(const Place& pl, int& had, int& total, int& record) const
 	{
@@ -923,6 +930,25 @@ struct MapTeleport : sms::Mod {
 			record = (int)g.flag_get(0x20005u + (uint32_t)stage); // as the episode select reads it
 			return true;
 		}
+		// the Airstrip (its one Shine, StageUtil's scShineTableAirport) and Corona Mountain (no Shines;
+		// its coin record kept in Super Mario Sunshine only: Eclipse keeps Erto Rock's there)
+		bool airstrip = false, corona = false;
+		if (sunshineWorlds())
+			airstrip = pl.world == 0, corona = pl.world == 52;
+		else
+			for (size_t i = 0; i < pl.areas.size(); i++)
+				airstrip = airstrip || areaKind(pl.areas[i]) == SMS_AREA_AIRSTRIP,
+				corona = corona || areaKind(pl.areas[i]) == SMS_AREA_FINAL;
+		if (airstrip) {
+			had    = g.flag_get(shineFlag(0x56)) ? 1 : 0;
+			total  = 1;
+			record = (int)g.flag_get(0x20005u);
+			return true;
+		}
+		if (corona) {
+			record = sunshineWorlds() ? (int)g.flag_get(0x20005u + 9) : -1;
+			return true;
+		}
 		if (sunshineWorlds())
 			return false;
 		const EclipseLevel* lv = nullptr;
@@ -934,8 +960,7 @@ struct MapTeleport : sms::Mod {
 			had += g.flag_get(shineFlag(lv->first + i)) ? 1 : 0;
 		had += g.flag_get(shineFlag(lv->coins)) ? 1 : 0;
 		total = lv->n + 1;
-		if (lv->record >= 0)
-			record = (int)g.flag_get(0x20005u + (uint32_t)lv->record);
+		record = lv->record >= 0 ? (int)g.flag_get(0x20005u + (uint32_t)lv->record) : -2;
 		return true;
 	}
 
