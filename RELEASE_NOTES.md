@@ -1,5 +1,8 @@
 **Map Teleport** opens a map of Isle Delfino in any level and takes Mario straight to any level your save file has reached. It works in both Super Mario Sunshine and Super Mario Eclipse.
 
+## What's new in 1.2.0
+- **Button prompts for your controller:** a new setting, **Button prompts for**, shows the map's button hints for an Xbox, PlayStation, Switch or GameCube controller, or the keyboard and mouse. Xbox by default.
+
 ## What's new in 1.1.2
 - **Shines and coin records in Super Mario Eclipse:** the side panel now shows how many Shines you have in each level and its coin record, in Eclipse's own levels too (Erto Rock, Lighthouse Island, Warship Island, Hotel Lacrima, Pianta Pit, the Daisy Cruiser and its worlds).
 - **Delfino Airstrip and Corona Mountain:** the side panel now shows their Shine and coin record as well.

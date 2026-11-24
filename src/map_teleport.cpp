@@ -1104,7 +1104,16 @@ struct MapTeleport : sms::Mod {
 
 		// what the buttons do
 		char help[128];
-		snprintf(help, sizeof help, "%s", "Move to a level   A teleport   B close");
+		// in the buttons of the player's own controller (setting "prompts"; the port reads every controller as
+		// the game's, its bottom face button as A and the right one as B, so a Switch controller's B is A)
+		static const char* const kHelp[] = {
+		    "Move to a level   A teleport   B close",                               // Xbox
+		    "Move to a level   Cross teleport   Circle close",                      // PlayStation
+		    "Move to a level   B teleport   A close",                               // Switch
+		    "Move to a level   A teleport   B close",                               // GameCube
+		    "Arrow keys move   Left click teleport   Right click or N close"};      // keyboard and mouse
+		const int pr = setting("prompts", 0);
+		snprintf(help, sizeof help, "%s", kHelp[pr >= 0 && pr < 5 ? pr : 0]);
 		d.text(cw * 0.5f, my + mapH + 8, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, help);
 		if (shadowMarioFirst())
 			d.text(cw * 0.5f, my + mapH + 26, 12, SMS_RGB(255, 170, 90), SMS_TEXT_SHADOW | SMS_TEXT_CENTER,
@@ -1123,6 +1132,8 @@ struct MapTeleport : sms::Mod {
 		kRight  = input().key_from_name("Right");
 		static const char* const kButtons[] = {"None", "D-pad up", "Z and D-pad up"};
 		optionChoice("pad_button", "Controller button to open the map", std::vector<const char*>(kButtons, kButtons + 3), 1);
+		static const char* const kPrompts[] = {"Xbox", "PlayStation", "Switch", "GameCube", "Keyboard and mouse"};
+		optionChoice("prompts", "Button prompts for", std::vector<const char*>(kPrompts, kPrompts + 5), 0);
 		optionBool("all_levels", "Every level can be teleported to (not only the ones reached)", false);
 		optionBool("shadow_mario", "Go to Delfino Plaza first while Shadow Mario waits there", true);
 		optionBool("go_back", "B in the episode select goes back to where you teleported from", true);
