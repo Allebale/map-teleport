@@ -201,6 +201,7 @@ struct MapTeleport : sms::Mod {
 	int openKey = -1;
 	int kUp = -1, kDown = -1, kLeft = -1, kRight = -1;
 	int teleportKey = -1, closeKey = -1;
+	double guideFrom = -1; // the keyboard guide shown since (the Mods menu's "How to set the keyboard keys")
 	bool waitRelease = false; // closed: the game sees nothing until every button is let go
 
 	bool shown   = false; // the map is up
@@ -936,6 +937,43 @@ struct MapTeleport : sms::Mod {
 		return y;
 	}
 
+	// the keyboard guide: where settings.ini is and the two lines to add; gone after 40 s, or at Enter, Escape or
+	// a controller's B once the Mods menu is closed
+	void drawGuide(float cw, float ch)
+	{
+		if (guideFrom < 0)
+			return;
+		const double t = core().time() - guideFrom;
+		const int esc = input().key_from_name("Escape"), ret = input().key_from_name("Return");
+		SmsPad p = SmsPad();
+		input().pad(0, &p);
+		if (t > 40.0 || (t > 0.5 && (key(esc) || key(ret) || (p.connected && (p.pressed & SMS_PAD_B))))) {
+			guideFrom = -1;
+			return;
+		}
+		const SmsDrawApi& d = draw();
+		const float w = 760, h = 300, x = (cw - w) * 0.5f, y = (ch - h) * 0.5f;
+		d.rect(x, y, w, h, SMS_RGBA(20, 25, 40, 240));
+		d.rect_outline(x, y, w, h, 2.0f, SMS_RGB(255, 200, 80));
+		const char* dir = core().data_dir ? core().data_dir(handle()) : nullptr;
+		std::string where = std::string(dir && *dir ? dir : "%APPDATA%/sms-port/mods/map-teleport") + "/settings.ini";
+		const char* lines[] = {
+		    "Map Teleport: keyboard keys",
+		    "",
+		    "1. Close the game, then open this file in Notepad:",
+		    where.c_str(),
+		    "2. Add these two lines (any key names you like):",
+		    "      key.teleport = Space",
+		    "      key.close = F",
+		    "3. Save the file and start the game again.",
+		    "",
+		    "Until they are set, the map's prompts say Not set.     (Enter or Escape closes this)"};
+		float ly = y + 18;
+		for (int i = 0; i < 10; i++, ly += i == 1 ? 34 : 26)
+			d.text(x + 24, ly, i == 0 ? 20 : (i == 3 ? 12 : 15), i == 0 ? SMS_RGB(255, 200, 80) : (i == 3 || i == 5 || i == 6) ? SMS_RGB(150, 220, 255) : SMS_RGB(255, 255, 255),
+			       SMS_TEXT_SHADOW, lines[i]);
+	}
+
 	void drawPanel(float px, float py, float pw, float ph)
 	{
 		const SmsDrawApi& d = draw();
@@ -1141,6 +1179,14 @@ struct MapTeleport : sms::Mod {
 		openKey = bindKey("open_map", "N");
 		// the keyboard's own teleport and close keys: none until the player sets them (key.teleport, key.close
 		// in the mod's settings.ini), shown as "Not set"
+		{ // a button in the Mods menu: shows how to set the keyboard's teleport and close keys
+			SmsOption o = SmsOption();
+			o.size = sizeof o, o.key = "keyboard_guide", o.label = "How to set the keyboard keys (shows a guide)";
+			o.type = SMS_OPTION_ACTION;
+			o.user = this;
+			o.on_change = [](SmsMod*, const char*, void* user) { static_cast<MapTeleport*>(user)->guideFrom = static_cast<MapTeleport*>(user)->core().time(); };
+			config().add_option(handle(), &o);
+		}
 		teleportKey = bindKey("teleport", "");
 		closeKey    = bindKey("close", "");
 		kUp     = input().key_from_name("Up");
@@ -1309,6 +1355,7 @@ struct MapTeleport : sms::Mod {
 			controls();
 		});
 		on<SmsEvDraw>(SMS_EV_DRAW, [this](SmsEvDraw& d) {
+			drawGuide(d.canvas_w, d.canvas_h);
 			if (shown)
 				drawMap(d.canvas_w, d.canvas_h);
 			if (backArmed && !goingBack && state().mode == SMS_MODE_TITLE)
