@@ -200,6 +200,7 @@ struct MapTeleport : sms::Mod {
 
 	int openKey = -1;
 	int kUp = -1, kDown = -1, kLeft = -1, kRight = -1;
+	int teleportKey = -1, closeKey = -1;
 	bool waitRelease = false; // closed: the game sees nothing until every button is let go
 
 	bool shown   = false; // the map is up
@@ -738,6 +739,24 @@ struct MapTeleport : sms::Mod {
 	}
 
 	bool key(int k) const { return k > 0 && input().key_pressed(k); }
+	bool keyHeld(int k) const { return k > 0 && input().key_down(k); }
+	// the buttons named as on the player's controller (setting "prompts"): teleport (the game's A) and close (B).
+	// The port reads the bottom face button as A and the right one as B, so a Switch controller's B is A, and
+	// PlayStation's are X and O. Keyboard: the keys set in the mod's settings (key.teleport, key.close)
+	std::string keyLabel(int k) const
+	{
+		const char* n = k > 0 ? input().key_name(k) : nullptr;
+		return n && *n ? std::string(n) : std::string("Not set");
+	}
+	std::string buttonName(bool closeButton) const
+	{
+		switch (setting("prompts", 0)) {
+		case 1: return closeButton ? "O" : "X";
+		case 2: return closeButton ? "A" : "B";
+		case 4: return keyLabel(closeButton ? closeKey : teleportKey);
+		default: return closeButton ? "B" : "A";
+		}
+	}
 
 	// every button and stick let go (the controller as read, keyboard and mouse too)
 	bool allLetGo() const
@@ -773,8 +792,8 @@ struct MapTeleport : sms::Mod {
 		lastDir = dir;
 
 		// (the keyboard and mouse as the port maps them: a left click is A, a right click B, Enter Start)
-		const bool choose = (pressed & SMS_PAD_A) != 0;
-		const bool back   = (pressed & (SMS_PAD_B | SMS_PAD_START)) || key(openKey);
+		const bool choose = (pressed & SMS_PAD_A) != 0 || key(teleportKey);
+		const bool back   = (pressed & (SMS_PAD_B | SMS_PAD_START)) || key(openKey) || key(closeKey);
 
 		if (step) {
 			const float dx = dir == 3 ? -1.0f : dir == 4 ? 1.0f : 0.0f, dy = dir == 1 ? -1.0f : dir == 2 ? 1.0f : 0.0f;
@@ -1106,14 +1125,8 @@ struct MapTeleport : sms::Mod {
 		char help[128];
 		// in the buttons of the player's own controller (setting "prompts"; the port reads every controller as
 		// the game's, its bottom face button as A and the right one as B, so a Switch controller's B is A)
-		static const char* const kHelp[] = {
-		    "Move to a level   A teleport   B close",                               // Xbox
-		    "Move to a level   Cross teleport   Circle close",                      // PlayStation
-		    "Move to a level   B teleport   A close",                               // Switch
-		    "Move to a level   A teleport   B close",                               // GameCube
-		    "Arrow keys move   Left click teleport   Right click or N close"};      // keyboard and mouse
-		const int pr = setting("prompts", 0);
-		snprintf(help, sizeof help, "%s", kHelp[pr >= 0 && pr < 5 ? pr : 0]);
+		snprintf(help, sizeof help, "%s   %s teleport   %s close", setting("prompts", 0) == 4 ? "Arrow keys move" : "Move to a level",
+		         buttonName(false).c_str(), buttonName(true).c_str());
 		d.text(cw * 0.5f, my + mapH + 8, 12, SMS_RGB(255, 255, 255), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, help);
 		if (shadowMarioFirst())
 			d.text(cw * 0.5f, my + mapH + 26, 12, SMS_RGB(255, 170, 90), SMS_TEXT_SHADOW | SMS_TEXT_CENTER,
@@ -1126,6 +1139,10 @@ struct MapTeleport : sms::Mod {
 	int load() override
 	{
 		openKey = bindKey("open_map", "N");
+		// the keyboard's own teleport and close keys: none until the player sets them (key.teleport, key.close
+		// in the mod's settings.ini), shown as "Not set"
+		teleportKey = bindKey("teleport", "");
+		closeKey    = bindKey("close", "");
 		kUp     = input().key_from_name("Up");
 		kDown   = input().key_from_name("Down");
 		kLeft   = input().key_from_name("Left");
@@ -1238,6 +1255,7 @@ struct MapTeleport : sms::Mod {
 				bool b = false;
 				for (int i = 0; i < 4; i++)
 					b = b || (r.pads[i].err == 0 && (r.pads[i].buttons & SMS_PAD_B));
+				b = b || keyHeld(closeKey); // the keyboard's close key, when one is set
 				if (!goingBack && b && !bHeld) {
 					goingBack = true, pressFrames = 0;
 					sound(SMS_SOUND_CANCEL);
@@ -1296,7 +1314,7 @@ struct MapTeleport : sms::Mod {
 			if (backArmed && !goingBack && state().mode == SMS_MODE_TITLE)
 				// bottom right, clear of the select's score
 				draw().text(d.canvas_w - 28.0f, d.canvas_h - 36.0f, 14, SMS_RGB(255, 255, 255), SMS_TEXT_OUTLINE | SMS_TEXT_RIGHT,
-				            "B  Go back");
+				            (buttonName(true) + "  Go back").c_str());
 
 		});
 
