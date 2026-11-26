@@ -854,6 +854,38 @@ struct MapTeleport : sms::Mod {
 		pictures[file] = im;
 		return im;
 	}
+	// a Super Mario Sunshine world's English name, by the area it is entered by: its picture keeps that
+	// name in every language (the game names the level in the player's, e.g. "Place Delfino" in French)
+	static const char* englishName(int area)
+	{
+		switch (area) {
+		case 0: return "Delfino Airstrip";
+		case 1: return "Delfino Plaza";
+		case 2: return "Bianco Hills";
+		case 3: return "Ricco Harbor";
+		case 4: return "Gelato Beach";
+		case 5: return "Pinna Park";
+		case 6: return "Sirena Beach";
+		case 8: return "Pianta Village";
+		case 9: return "Noki Bay";
+		case 52: return "Corona Mountain";
+		default: return nullptr;
+		}
+	}
+	// the name a place's picture goes by: its English name for a Super Mario Sunshine world, else its own
+	std::string pictureKey(const Place& pl) const
+	{
+		const char* en = sunshineWorlds() ? englishName(pl.world) : nullptr;
+		return en ? en : pl.name;
+	}
+	// its picture: by the English name, or (a picture of the player's own) by the name in their language
+	SmsImage picture(const Place& pl)
+	{
+		SmsImage im = picture(pictureKey(pl));
+		if (!im && pictureKey(pl) != pl.name)
+			im = picture(pl.name);
+		return im;
+	}
 
 	// a few words on a Super Mario Sunshine level (the mod's own), or null
 	static const char* about(const std::string& name)
@@ -990,7 +1022,7 @@ struct MapTeleport : sms::Mod {
 
 		// its picture (16 by 9), or where one may go
 		const float iw = pw - 24, ih = iw * 9.0f / 16.0f;
-		const SmsImage im = picture(pl.name);
+		const SmsImage im = picture(pl);
 		if (im) {
 			d.image(im, px + 12, y, iw, ih, pl.open ? SMS_RGB(255, 255, 255) : SMS_RGB(110, 110, 110));
 		} else {
@@ -998,7 +1030,7 @@ struct MapTeleport : sms::Mod {
 			d.rect_outline(px + 12, y, iw, ih, 1.0f, SMS_RGBA(255, 255, 255, 60));
 			d.text(px + 12 + iw * 0.5f, y + ih * 0.5f - 12, 11, SMS_RGB(170, 170, 180), SMS_TEXT_SHADOW | SMS_TEXT_CENTER, "No picture yet");
 			d.text(px + 12 + iw * 0.5f, y + ih * 0.5f + 4, 9, SMS_RGB(130, 130, 140), SMS_TEXT_SHADOW | SMS_TEXT_CENTER,
-			       pictureName(pl.name).c_str());
+			       pictureName(pictureKey(pl)).c_str());
 		}
 		y += ih + 10;
 
